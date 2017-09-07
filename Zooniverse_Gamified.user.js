@@ -1,0 +1,1 @@
+/home/giuliano/.mozilla/firefox/hmdka1ff.default/gm_scripts/Zooniverse_Gamified/Zooniverse_Gamified.user.js
