@@ -1,4 +1,4 @@
-// ==UserScript==
+﻿// ==UserScript==
 // @name        Zooniverse Gamified
 // @namespace   colaboratorio
 // @description Adds a layer of gamification to Zooniverse
