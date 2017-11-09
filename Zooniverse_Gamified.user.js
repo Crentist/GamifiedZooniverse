@@ -4,13 +4,17 @@
 // @description Adds a layer of gamification to Zooniverse
 // @match       *://www.zooniverse.org/*
 // @version     1
+// @grant GM_xmlhttpRequest
+// @grant unsafeWindow
 // ==/UserScript==
 //window.addEventListener("load", function (){
 
-	serverUrl = "http://localhost:3000"
+	serverUrl = "http://localhost:3000";
 
   console.log("Welcome to Zooniverse Gamified!");
+
   if ((window.location.href.indexOf('classify') > -1)) {
+  	console.log("Classifying")
 	  var awaiting = setInterval(function() { //Se podrá hacer con Promise?
 	    var classifierElement = document.querySelector('.classifier');
 	    if (classifierElement != undefined) {
@@ -20,13 +24,26 @@
 	  }, 100);
 
 		function doPostRequest(url, parameters) {
-			var xhr = new XMLHttpRequest();
-			xhr.open("POST", url, false);
+			console.log(url);
+
+			var gmr = GM_xmlhttpRequest({
+				method: "POST",
+				url: url,
+				data: parameters,
+				headers: { "Content-Type": "application/json" },				
+				onload: function(response) {
+					console.log(response);
+				}
+			});
+			console.log(gmr);
+
+			//var xhr = new XMLHttpRequest();
+			//xhr.open("POST", url, false);
 
 			//Send the proper header information along with the request
-			xhr.setRequestHeader("Content-type", "application/json");
-			xhr.send(parameters);	
-			console.log(xhr.responseText);
+			//xhr.setRequestHeader("Content-type", "application/json");
+			//xhr.send(parameters);	
+			//console.log(xhr.responseText);
 		}
 
 	  function addScoreboard() {
@@ -81,12 +98,15 @@
 	    //document.getElementsByClassName('continue major-button')[0] >> el botón de Next o Done. Adentro tienen un span que tiene el texto que corresponde
 	    //document.getElementsByClassName('drawing-tool-button-input') >> indica que la tarea es de tipo dibujo
 
-
+	    projectName = JSON.stringify(document.getElementsByClassName('tabbed-content-tab')[0].text);
 	    //projectName = JSON.stringify(document.getElementsByClassName('tabbed-content-tab')[0].text);
-	    //if (projectName != null) {
-		    //params = JSON.stringify({"name": projectName});
-		    //doPostRequest(serverUrl + "/projects", params);
-	  	//}
+	    console.log(projectName);
+	    projectName = projectName.replace(/"/g,"");
+	    console.log(projectName);
+	    if (projectName != null) {
+		    params = JSON.stringify({"name": projectName});
+		    doPostRequest(serverUrl + "/projects", params);
+	  	}
 
 	    //Div + tabla de puntos
       var scoreboardDiv = document.createElement('div');
@@ -113,6 +133,83 @@
 
       scoreboardDiv.appendChild(scoreboardTable);
       console.log("Appended table to div");	
-      document.getElementsByClassName('task-area')[0].parentNode.insertBefore(scoreboardDiv, document.getElementsByClassName('task-area')[0].nextSibling);
+      var taskArea = document.getElementsByClassName('task-area')[0];
+      taskArea.parentNode.insertBefore(scoreboardDiv, document.getElementsByClassName('task-area')[0].nextSibling);
+
+      var contributionDiv = document.createElement('div');
+      contributionDiv.id = 'contributionDiv';
+      var contributionHeaderDiv = document.createElement('div');
+      contributionHeaderDiv.id = 'contributionHeaderDiv';
+      contributionHeaderDiv.style.textAlign = 'center';
+      contributionHeaderDiv.style.padding = '5px 5px 5px 5px';
+      var strongTitleTextHolder = document.createElement('strong');
+      strongTitleTextHolder.appendChild(document.createTextNode('Mi contribución en ' + projectName));
+      contributionHeaderDiv.appendChild(strongTitleTextHolder);
+      contributionDiv.appendChild(contributionHeaderDiv);
+
+      var contributionDataDiv = document.createElement('div');
+      var sinceSpan = document.createElement('span');
+      sinceSpan.style.display = 'inline-block';
+      var firstContributionDate = '01/01/1900'; //placeholder
+      sinceSpan.innerHTML = 'Colaborando desde el <strong> '+ firstContributionDate +' </strong>';
+
+      var lastContributionSpan = document.createElement('span');
+      lastContributionSpan.style.float = 'right';
+      lastContributionSpan.style.display = 'inline-block';
+      var lastContributionDateTime = '12 horas'; //placeholder
+      lastContributionSpan.innerHTML = 'Última contribución hace: <strong> '+ lastContributionDateTime +' </strong>';
+
+      contributionDataDiv.appendChild(sinceSpan);
+      contributionDataDiv.appendChild(lastContributionSpan);
+      contributionDataDiv.appendChild(document.createElement('br'));
+      contributionDataDiv.appendChild(document.createElement('br'));
+
+      var classificationsDiv = document.createElement('div');
+      classificationsDiv.style.width = '50%';
+      classificationsDiv.style.textAlign = 'center';
+      classificationsDiv.style.display = 'inline-block';
+      var classificationsSpan = document.createElement('span');
+      classificationsSpan.innerHTML = 'Clasificaciones';
+      classificationsDiv.appendChild(classificationsSpan);
+      classificationsDiv.appendChild(document.createElement('br'));
+      var classificationCountSpan = document.createElement('span');
+      var userClassificationCount = '52'; //placeholder
+      classificationCountSpan.innerHTML = '<strong>' + userClassificationCount + '</strong>';
+      classificationsDiv.appendChild(classificationCountSpan);
+			classificationsDiv.appendChild(document.createElement('br'));
+
+			contributionDataDiv.appendChild(classificationsDiv);
+
+      var badgesDiv = document.createElement('div');
+      badgesDiv.style.display = 'inline-block';
+      badgesDiv.style.width = '20%';
+      badgesDiv.style.position = 'absolute';
+      badgesDiv.style.textAlign = 'center';
+
+      var badgesStrong = document.createElement('strong');
+      badgesStrong.style.display = 'inline-block';
+      badgesStrong.innerHTML = 'Mis insignias';
+
+      badgesDiv.appendChild(badgesStrong);
+      badgesDiv.appendChild(document.createElement('br'));
+      badgesDiv.appendChild(document.createElement('br'));
+      badgesDiv.appendChild(document.createElement('br'));
+
+      var nextMilestoneSpan = document.createElement('span');
+      var milestoneText = document.createElement('font');
+      milestoneText.size = '1';
+      var milestoneValue = '48'; //Placeholder
+      milestoneText.innerHTML = 'Realizá <strong> ' + milestoneValue + ' </strong> clasificaciones más para la siguiente insignia!';
+
+      nextMilestoneSpan.appendChild(milestoneText);
+      badgesDiv.appendChild(nextMilestoneSpan);
+
+      contributionDataDiv.appendChild(badgesDiv);
+
+      taskArea.appendChild(contributionDiv); //El div con lo de mi colaboración
+      taskArea.appendChild(contributionDataDiv);
+
+
+
 	  }
-}
+	}
