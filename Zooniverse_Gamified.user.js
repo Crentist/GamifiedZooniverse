@@ -24,59 +24,27 @@
 	  }, 100);
 
 		function doGetRequest(url) {
-			//console.log(url);
-
-			var gmr = GM_xmlhttpRequest({
+			var xhttp = GM_xmlhttpRequest({
 				method: "GET",
 				url: url,
 				headers: { "Content-Type": "application/json" },				
-				onload: function(response) {
-					return response;
-				}
+				synchronous: true
 			});
-			//console.log(gmr);
-
-			//var xhr = new XMLHttpRequest();
-			//xhr.open("POST", url, false);
-
-			//Send the proper header information along with the request
-			//xhr.setRequestHeader("Content-type", "application/json");
-			//xhr.send(parameters);	
-			//console.log(xhr.responseText);
+			return xhttp.responseText;
 		}	  
 
 		function doPostRequest(url, parameters) {
-			//console.log(url);
-
-			var gmr = GM_xmlhttpRequest({
+			var xhttp = GM_xmlhttpRequest({
 				method: "POST",
 				url: url,
 				data: parameters,
 				headers: { "Content-Type": "application/json" },				
-				onload: function(response) {
-					return response;
-				}
+				synchronous: true
 			});
-			//console.log(gmr);
-
-			//var xhr = new XMLHttpRequest();
-			//xhr.open("POST", url, false);
-
-			//Send the proper header information along with the request
-			//xhr.setRequestHeader("Content-type", "application/json");
-			//xhr.send(parameters);	
-			//console.log(xhr.responseText);
+			return xhttp.responseText;
 		}
 
 	  function gameOn() {
-	    //var styleLink = document.createElement("LINK");
-	    //styleLink.setAttribute("rel", "stylesheet");
-	    //styleLink.setAttribute("type", "text/css");
-	    //styleLink.setAttribute("href", "https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css");
-	    //document.head.appendChild(styleLink);
-
-
-
 	  	var tableStyle = `element {
 												}
 												.table > caption + thead > tr:first-child > td, .table > caption + thead > tr:first-child > th, .table > colgroup + thead > tr:first-child > td, .table > colgroup + thead > tr:first-child > th, .table > thead:first-child > tr:first-child > td, .table > thead:first-child > tr:first-child > th {
@@ -115,31 +83,49 @@
 		    containerDiv.insertBefore(botonScore, document.getElementsByClassName('field-guide-pullout-toggle')[0].nextSibling);
 	  	}*/
 
-
 	    //Esto por ahí sirve para algo. Agrega un botón que despliega, al costado. Funciona solamente con proyectos que andan, creo, que tienen 'Field Guide'. Por ahí garpa poner los puntos ahí, para que no moleste en otro lado.
 
-	    //document.getElementsByClassName('tabbed-content-tab')[0].text >> esto obtiene el nombre del proyecto
 	    //document.getElementsByClassName('continue major-button')[0] >> el botón de Next o Done. Adentro tienen un span que tiene el texto que corresponde
 	    //document.getElementsByClassName('drawing-tool-button-input') >> indica que la tarea es de tipo dibujo
-	    //document.getElementsByClassName('site-nav__link')[9].children[0].innerHTML >> username logueado
 
-	    projectName = JSON.stringify(document.getElementsByClassName('tabbed-content-tab')[0].text).replace(/"/g,"");
-
+	    projectName = document.getElementsByClassName('tabbed-content-tab')[0].text.replace(/"/g,"");
+	    console.log(projectName);
+	    var projects = JSON.parse(doGetRequest(serverUrl + "/projects"));
+	    console.log(projects);
 	    if (projectName != null) {
 		    params = JSON.stringify({"name": projectName});
-		    doPostRequest(serverUrl + "/projects", params);
+		    //doPostRequest(serverUrl + "/projects", params);
+		    var project = projects.find(o => o.name === projectName);
+		    //console.log(project.collaborators)
+		    //Si no existe, lo creo
+		    if ( project == undefined ) {
+		  		console.log("no existe");
+		  		params = JSON.stringify({"name": projectName});
+					doPostRequest(serverUrl + "/projects", params);
+		  	}
 	  	}
+
+	  	//Tengo que traerme los datos del proyecto actual (o sea, levantar el id a partir de lo anterior). A partir de esto, agarrar el colaborador actual de la lista de colaboradores del proyecto, y armar el coso de info de abajo
 
 	  	if (document.getElementsByClassName('site-nav__link')[9] == undefined) {
 	  		//No está logueado, debería para que ande. Poner un aviso en algún lado. Un alert ni da. Estaría bueno uno de esos cartelitos que hoverean. Para esto y para otras cosas
-	  	} else {}
-	  	var userList = JSON.parse(doGetRequest(serverUrl + "/users"));
-	  	var loggedUser = document.getElementsByClassName('site-nav__link')[9].children[0].innerHTML.replace(/"/g,"");;
-	  	if ( userList.find(o => o.zooniverseHandle === loggedUser) != undefined ) {
-	  		params = JSON.stringify({"zooniverseHandle": loggedUser});
-				doPostRequest(serverUrl + "/users", params);
-	  	}
+	  	} else {
+		  	//console.log(doGetRequest(serverUrl + "/users"));
+		  	var userList = JSON.parse(doGetRequest(serverUrl + "/users"));
+		  	//console.log(userList);
+		  	var loggedUser = document.getElementsByClassName('site-nav__link')[9].children[0].innerHTML.replace(/"/g,"");
 
+		  	if ((project.collaborators.find(o => o.zooniverseHandle === loggedUser)) != undefined) {
+		  		//es colaborador, por lo tanto tengo que llenar el coso de mi colaboración con los valores que correspondan
+		  	}
+		  	//console.log(loggedUser);
+		  	//console.log(userList.find(o => o.zooniverseHandle == loggedUser));
+		  	if ( userList.find(o => o.zooniverseHandle === loggedUser) == undefined ) {
+		  		console.log("no existe");
+		  		params = JSON.stringify({"zooniverseHandle": loggedUser});
+					doPostRequest(serverUrl + "/users", params);
+		  	}
+			}
 	    //Div + tabla de puntos
       var scoreboardDiv = document.createElement('div');
       scoreboardDiv.style.marginLeft = '1em';
@@ -191,12 +177,13 @@
       var sinceSpan = document.createElement('span');
       sinceSpan.style.display = 'inline-block';
       var firstContributionDate = '01/01/1900'; //placeholder
-      sinceSpan.innerHTML = 'Colaborando desde el <strong> '+ firstContributionDate +' </strong>';
+      //sinceSpan.innerHTML = 'Colaborando desde el <strong> '+ firstContributionDate +' </strong>';
+      sinceSpan.innerHTML = 'Aún no has colaborado en este proyecto';
 
       var lastContributionSpan = document.createElement('span');
       lastContributionSpan.style.float = 'right';
       lastContributionSpan.style.display = 'inline-block';
-      var lastContributionDateTime = '12 horas'; //placeholder
+      var lastContributionDateTime = 'Nunca'; //placeholder
       lastContributionSpan.innerHTML = 'Última contribución hace: <strong> '+ lastContributionDateTime +' </strong>';
 
       contributionDataDiv.appendChild(sinceSpan);
@@ -213,7 +200,7 @@
       classificationsDiv.appendChild(classificationsSpan);
       classificationsDiv.appendChild(document.createElement('br'));
       var classificationCountSpan = document.createElement('span');
-      var userClassificationCount = '52'; //placeholder
+      var userClassificationCount = '0'; //placeholder
       classificationCountSpan.innerHTML = '<strong>' + userClassificationCount + '</strong>';
       classificationsDiv.appendChild(classificationCountSpan);
 			classificationsDiv.appendChild(document.createElement('br'));
