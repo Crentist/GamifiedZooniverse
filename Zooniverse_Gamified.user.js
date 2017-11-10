@@ -19,12 +19,34 @@
 	    var classifierElement = document.querySelector('.classifier');
 	    if (classifierElement != undefined) {
 	      clearInterval(awaiting);
-	      addScoreboard();
+	      gameOn();
 	    }
 	  }, 100);
 
+		function doGetRequest(url) {
+			//console.log(url);
+
+			var gmr = GM_xmlhttpRequest({
+				method: "GET",
+				url: url,
+				headers: { "Content-Type": "application/json" },				
+				onload: function(response) {
+					return response;
+				}
+			});
+			//console.log(gmr);
+
+			//var xhr = new XMLHttpRequest();
+			//xhr.open("POST", url, false);
+
+			//Send the proper header information along with the request
+			//xhr.setRequestHeader("Content-type", "application/json");
+			//xhr.send(parameters);	
+			//console.log(xhr.responseText);
+		}	  
+
 		function doPostRequest(url, parameters) {
-			console.log(url);
+			//console.log(url);
 
 			var gmr = GM_xmlhttpRequest({
 				method: "POST",
@@ -32,10 +54,10 @@
 				data: parameters,
 				headers: { "Content-Type": "application/json" },				
 				onload: function(response) {
-					console.log(response);
+					return response;
 				}
 			});
-			console.log(gmr);
+			//console.log(gmr);
 
 			//var xhr = new XMLHttpRequest();
 			//xhr.open("POST", url, false);
@@ -46,7 +68,7 @@
 			//console.log(xhr.responseText);
 		}
 
-	  function addScoreboard() {
+	  function gameOn() {
 	    //var styleLink = document.createElement("LINK");
 	    //styleLink.setAttribute("rel", "stylesheet");
 	    //styleLink.setAttribute("type", "text/css");
@@ -81,7 +103,7 @@
       document.head.appendChild(style);
 
 	    console.log("Found classify element");
-			if (document.getElementsByClassName('field-guide-pullout-toggle')[0] != null) {
+			/*if (document.getElementsByClassName('field-guide-pullout-toggle')[0] != null) {
  				var containerDiv = document.getElementsByClassName('field-guide-pullout-toggle')[0].parentNode;
  				var node = document.createElement("strong");               
 				var textnode = document.createTextNode("Puntoh");        
@@ -91,25 +113,36 @@
 		    botonScore.className = 'field-guide-pullout-toggle';
 		    botonScore.appendChild(node);
 		    containerDiv.insertBefore(botonScore, document.getElementsByClassName('field-guide-pullout-toggle')[0].nextSibling);
-	  	}
+	  	}*/
+
+
 	    //Esto por ahí sirve para algo. Agrega un botón que despliega, al costado. Funciona solamente con proyectos que andan, creo, que tienen 'Field Guide'. Por ahí garpa poner los puntos ahí, para que no moleste en otro lado.
 
 	    //document.getElementsByClassName('tabbed-content-tab')[0].text >> esto obtiene el nombre del proyecto
 	    //document.getElementsByClassName('continue major-button')[0] >> el botón de Next o Done. Adentro tienen un span que tiene el texto que corresponde
 	    //document.getElementsByClassName('drawing-tool-button-input') >> indica que la tarea es de tipo dibujo
+	    //document.getElementsByClassName('site-nav__link')[9].children[0].innerHTML >> username logueado
 
-	    projectName = JSON.stringify(document.getElementsByClassName('tabbed-content-tab')[0].text);
-	    //projectName = JSON.stringify(document.getElementsByClassName('tabbed-content-tab')[0].text);
-	    console.log(projectName);
-	    projectName = projectName.replace(/"/g,"");
-	    console.log(projectName);
+	    projectName = JSON.stringify(document.getElementsByClassName('tabbed-content-tab')[0].text).replace(/"/g,"");
+
 	    if (projectName != null) {
 		    params = JSON.stringify({"name": projectName});
 		    doPostRequest(serverUrl + "/projects", params);
 	  	}
 
+	  	if (document.getElementsByClassName('site-nav__link')[9] == undefined) {
+	  		//No está logueado, debería para que ande. Poner un aviso en algún lado. Un alert ni da. Estaría bueno uno de esos cartelitos que hoverean. Para esto y para otras cosas
+	  	} else {}
+	  	var userList = JSON.parse(doGetRequest(serverUrl + "/users"));
+	  	var loggedUser = document.getElementsByClassName('site-nav__link')[9].children[0].innerHTML.replace(/"/g,"");;
+	  	if ( userList.find(o => o.zooniverseHandle === loggedUser) != undefined ) {
+	  		params = JSON.stringify({"zooniverseHandle": loggedUser});
+				doPostRequest(serverUrl + "/users", params);
+	  	}
+
 	    //Div + tabla de puntos
       var scoreboardDiv = document.createElement('div');
+      scoreboardDiv.style.marginLeft = '1em';
       var scoreboardTable = document.createElement("table");
       scoreboardTable.className = 'table';
       scoreboardTable.id = "tablaPuntaje";
@@ -131,6 +164,13 @@
 
       //En estos tres últimos bloques del código tengo que primero pedir los colaboradores del proyecto a la API, y luego crear la tabla dentro de algún iterador
 
+      var scoreboardHeaderDiv = document.createElement('div');
+      scoreboardHeaderDiv.style.textAlign = 'center';
+      scoreboardHeaderDiv.style.padding = '5px 5px 5px 5px';
+      var scoreboardHeader = document.createElement('strong');
+      scoreboardHeader.innerHTML = "Tabla de puntajes";
+      scoreboardHeaderDiv.appendChild(scoreboardHeader);
+      scoreboardDiv.appendChild(scoreboardHeaderDiv);
       scoreboardDiv.appendChild(scoreboardTable);
       console.log("Appended table to div");	
       var taskArea = document.getElementsByClassName('task-area')[0];
