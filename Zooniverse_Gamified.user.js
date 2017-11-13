@@ -86,46 +86,12 @@
 	    //Esto por ahí sirve para algo. Agrega un botón que despliega, al costado. Funciona solamente con proyectos que andan, creo, que tienen 'Field Guide'. Por ahí garpa poner los puntos ahí, para que no moleste en otro lado.
 
 	    //document.getElementsByClassName('continue major-button')[0] >> el botón de Next o Done. Adentro tienen un span que tiene el texto que corresponde
+
+	    //document.getElementsByClassName
+
 	    //document.getElementsByClassName('drawing-tool-button-input') >> indica que la tarea es de tipo dibujo
 
-	    projectName = document.getElementsByClassName('tabbed-content-tab')[0].text.replace(/"/g,"");
-	    console.log(projectName);
-	    var projects = JSON.parse(doGetRequest(serverUrl + "/projects"));
-	    console.log(projects);
-	    if (projectName != null) {
-		    params = JSON.stringify({"name": projectName});
-		    //doPostRequest(serverUrl + "/projects", params);
-		    var project = projects.find(o => o.name === projectName);
-		    //console.log(project.collaborators)
-		    //Si no existe, lo creo
-		    if ( project == undefined ) {
-		  		console.log("no existe");
-		  		params = JSON.stringify({"name": projectName});
-					doPostRequest(serverUrl + "/projects", params);
-		  	}
-	  	}
 
-	  	//Tengo que traerme los datos del proyecto actual (o sea, levantar el id a partir de lo anterior). A partir de esto, agarrar el colaborador actual de la lista de colaboradores del proyecto, y armar el coso de info de abajo
-
-	  	if (document.getElementsByClassName('site-nav__link')[9] == undefined) {
-	  		//No está logueado, debería para que ande. Poner un aviso en algún lado. Un alert ni da. Estaría bueno uno de esos cartelitos que hoverean. Para esto y para otras cosas
-	  	} else {
-		  	//console.log(doGetRequest(serverUrl + "/users"));
-		  	var userList = JSON.parse(doGetRequest(serverUrl + "/users"));
-		  	//console.log(userList);
-		  	var loggedUser = document.getElementsByClassName('site-nav__link')[9].children[0].innerHTML.replace(/"/g,"");
-
-		  	if ((project.collaborators.find(o => o.zooniverseHandle === loggedUser)) != undefined) {
-		  		//es colaborador, por lo tanto tengo que llenar el coso de mi colaboración con los valores que correspondan
-		  	}
-		  	//console.log(loggedUser);
-		  	//console.log(userList.find(o => o.zooniverseHandle == loggedUser));
-		  	if ( userList.find(o => o.zooniverseHandle === loggedUser) == undefined ) {
-		  		console.log("no existe");
-		  		params = JSON.stringify({"zooniverseHandle": loggedUser});
-					doPostRequest(serverUrl + "/users", params);
-		  	}
-			}
 	    //Div + tabla de puntos
       var scoreboardDiv = document.createElement('div');
       scoreboardDiv.style.marginLeft = '1em';
@@ -162,6 +128,8 @@
       var taskArea = document.getElementsByClassName('task-area')[0];
       taskArea.parentNode.insertBefore(scoreboardDiv, document.getElementsByClassName('task-area')[0].nextSibling);
 
+	    projectName = document.getElementsByClassName('tabbed-content-tab')[0].text.replace(/"/g,"");
+
       var contributionDiv = document.createElement('div');
       contributionDiv.id = 'contributionDiv';
       var contributionHeaderDiv = document.createElement('div');
@@ -176,7 +144,7 @@
       var contributionDataDiv = document.createElement('div');
       var sinceSpan = document.createElement('span');
       sinceSpan.style.display = 'inline-block';
-      var firstContributionDate = '01/01/1900'; //placeholder
+
       //sinceSpan.innerHTML = 'Colaborando desde el <strong> '+ firstContributionDate +' </strong>';
       sinceSpan.innerHTML = 'Aún no has colaborado en este proyecto';
 
@@ -236,7 +204,51 @@
       taskArea.appendChild(contributionDiv); //El div con lo de mi colaboración
       taskArea.appendChild(contributionDataDiv);
 
+	    console.log(projectName);
+	    var projects = JSON.parse(doGetRequest(serverUrl + "/projects"));
+	    console.log(projects);
+	    if (projectName != null) {
+		    params = JSON.stringify({"name": projectName});
+		    //doPostRequest(serverUrl + "/projects", params);
+		    var project = projects.find(o => o.name === projectName);
+		    console.log(project)
+		    //Si no existe, lo creo
+		    if ( project == undefined ) {
+		  		console.log("no existe");
+		  		params = JSON.stringify({"name": projectName});
+					doPostRequest(serverUrl + "/projects", params);
+		  	}
+	  	}
 
+	  	//Tengo que traerme los datos del proyecto actual (o sea, levantar el id a partir de lo anterior). A partir de esto, agarrar el colaborador actual de la lista de colaboradores del proyecto, y armar el coso de info de abajo
+
+	  	if (document.getElementsByClassName('site-nav__link')[9] == undefined) {
+	  		//No está logueado, debería para que ande. Poner un aviso en algún lado. Un alert ni da. Estaría bueno uno de esos cartelitos que hoverean. Para esto y para otras cosas
+	  	} else {
+		  	//console.log(doGetRequest(serverUrl + "/users"));
+		  	var userList = JSON.parse(doGetRequest(serverUrl + "/users"));
+		  	//console.log(userList);
+		  	var loggedUser = document.getElementsByClassName('site-nav__link')[9].children[0].innerHTML.replace(/"/g,"");
+
+		  	if ((project.collaborators.find(o => o.zooniverseHandle === loggedUser)) != undefined) {
+		  		//es colaborador, por lo tanto tengo que llenar el coso de mi colaboración con los valores que correspondan
+		  		//Adicionalmente, que sea colaborador implica que al menos tenga una clasificación
+		      var firstContributionDate = '01/01/1900'; //placeholder. Un GET a una URL tipo /users/:user_id/collaborations/:project_id. O si no, tengo que filtrar desde acá
+		  		sinceSpan.innerHTML = 'Colaborando desde el <strong>' + firstContributionDate + '</strong>';
+		  		lastContributionDateTime = '12 horas'; //placeholder
+		  		lastContributionSpan.innerHTML = 'Última contribución hace: <strong> '+ lastContributionDateTime +' </strong>';
+		      var userClassificationCount = '0'; //placeholder
+		      classificationCountSpan.innerHTML = '<strong> ' + userClassificationCount + ' </strong>';
+		  	}
+		  	//console.log(loggedUser);
+		  	//console.log(userList.find(o => o.zooniverseHandle == loggedUser));
+		  	if ( userList.find(o => o.zooniverseHandle === loggedUser) == undefined ) {
+		  		console.log("No existe");
+		  		console.log("Cargando usuario a la BBDD del backend");
+		  		params = JSON.stringify({"zooniverseHandle": loggedUser});
+					doPostRequest(serverUrl + "/users", params);
+		  	}
+			}
 
 	  }
 	}
