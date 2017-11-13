@@ -87,7 +87,13 @@
 
 	    //document.getElementsByClassName('continue major-button')[0] >> el botón de Next o Done. Adentro tienen un span que tiene el texto que corresponde
 
-	    //document.getElementsByClassName
+	    document.getElementsByClassName('continue major-button')[0].addEventListener("click", function(){
+				if ((document.getElementsByClassName('continue major-button')[0].children[0].innerHTML) == 'Done') {
+					//POSTear los puntos. Generar la colaboración, o bien sumar los puntos.
+				} else if ((document.getElementsByClassName('continue major-button')[0].children[0].innerHTML) == 'Next') {
+					//Sumar los puntos.
+				}
+			}); 
 
 	    //document.getElementsByClassName('drawing-tool-button-input') >> indica que la tarea es de tipo dibujo
 
