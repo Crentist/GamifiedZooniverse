@@ -90,6 +90,7 @@
 	    document.getElementsByClassName('continue major-button')[0].addEventListener("click", function(){
 				if ((document.getElementsByClassName('continue major-button')[0].children[0].innerHTML) == 'Done') {
 					//POSTear los puntos. Generar la colaboración, o bien sumar los puntos.
+					//"/projects/" + project.id + "/collaborations"
 				} else if ((document.getElementsByClassName('continue major-button')[0].children[0].innerHTML) == 'Next') {
 					//Sumar los puntos.
 				}
