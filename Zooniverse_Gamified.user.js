@@ -93,6 +93,7 @@
 					//"/projects/" + project.id + "/collaborations"
 				} else if ((document.getElementsByClassName('continue major-button')[0].children[0].innerHTML) == 'Next') {
 					//Sumar los puntos.
+					//Cuando es Next, es tanto para pasar a la siguiente pregunta del workflow como para pasar a la siguiente clasificación
 				}
 			}); 
 
@@ -212,49 +213,38 @@
       taskArea.appendChild(contributionDataDiv);
 
 	    console.log(projectName);
-	    var projects = JSON.parse(doGetRequest(serverUrl + "/projects"));
-	    console.log(projects);
-	    if (projectName != null) {
-		    params = JSON.stringify({"name": projectName});
-		    //doPostRequest(serverUrl + "/projects", params);
-		    var project = projects.find(o => o.name === projectName);
-		    console.log(project)
-		    //Si no existe, lo creo
-		    if ( project == undefined ) {
-		  		console.log("no existe");
-		  		params = JSON.stringify({"name": projectName});
-					doPostRequest(serverUrl + "/projects", params);
-		  	}
-	  	}
+
+	    //POSTeo de una. Si ya existe con ese nombre, me lo devuelve
+  		params = JSON.stringify({"name": projectName});
+			var project = doPostRequest(serverUrl + "/projects", params);
+			console.log(project);
 
 	  	//Tengo que traerme los datos del proyecto actual (o sea, levantar el id a partir de lo anterior). A partir de esto, agarrar el colaborador actual de la lista de colaboradores del proyecto, y armar el coso de info de abajo
 
 	  	if (document.getElementsByClassName('site-nav__link')[9] == undefined) {
 	  		//No está logueado, debería para que ande. Poner un aviso en algún lado. Un alert ni da. Estaría bueno uno de esos cartelitos que hoverean. Para esto y para otras cosas
 	  	} else {
-		  	//console.log(doGetRequest(serverUrl + "/users"));
-		  	var userList = JSON.parse(doGetRequest(serverUrl + "/users"));
-		  	//console.log(userList);
-		  	var loggedUser = document.getElementsByClassName('site-nav__link')[9].children[0].innerHTML.replace(/"/g,"");
 
-		  	if ((project.collaborators.find(o => o.zooniverseHandle === loggedUser)) != undefined) {
-		  		//es colaborador, por lo tanto tengo que llenar el coso de mi colaboración con los valores que correspondan
-		  		//Adicionalmente, que sea colaborador implica que al menos tenga una clasificación
-		      var firstContributionDate = '01/01/1900'; //placeholder. Un GET a una URL tipo /users/:user_id/collaborations/:project_id. O si no, tengo que filtrar desde acá
-		  		sinceSpan.innerHTML = 'Colaborando desde el <strong>' + firstContributionDate + '</strong>';
-		  		lastContributionDateTime = '12 horas'; //placeholder
-		  		lastContributionSpan.innerHTML = 'Última contribución hace: <strong> '+ lastContributionDateTime +' </strong>';
-		      var userClassificationCount = '0'; //placeholder
-		      classificationCountSpan.innerHTML = '<strong> ' + userClassificationCount + ' </strong>';
-		  	}
-		  	//console.log(loggedUser);
-		  	//console.log(userList.find(o => o.zooniverseHandle == loggedUser));
-		  	if ( userList.find(o => o.zooniverseHandle === loggedUser) == undefined ) {
-		  		console.log("No existe");
-		  		console.log("Cargando usuario a la BBDD del backend");
-		  		params = JSON.stringify({"zooniverseHandle": loggedUser});
-					doPostRequest(serverUrl + "/users", params);
-		  	}
+		  	var loggedUser = document.getElementsByClassName('site-nav__link')[9].children[0].innerHTML.replace(/"/g,"");
+	  		params = JSON.stringify({"zooniverseHandle": loggedUser});
+				var user = doPostRequest(serverUrl + "/users", params);
+				if (project.collaborators != undefined) {
+			  	if ((project.collaborators.find(o => o.zooniverseHandle === loggedUser)) != undefined) {
+			  		//es colaborador, por lo tanto tengo que llenar el coso de mi colaboración con los valores que correspondan
+			  		//Adicionalmente, que sea colaborador implica que al menos tenga una clasificación
+			      var firstContributionDate = doGetRequest("/users/"+user.id+"/collaboration/"+project.id).created_at;// '01/01/1900'; //placeholder. Un GET a una URL tipo /users/:user_id/collaboration/:project_id. O si no, tengo que filtrar desde acá. created_at es la primera; updated_at es la última
+			      console.log(firstContributionDate);
+			  		sinceSpan.innerHTML = 'Colaborando desde el <strong>' + firstContributionDate + '</strong>';
+			  		lastContributionDateTime = '12 horas'; //placeholder
+			  		lastContributionSpan.innerHTML = 'Última contribución hace: <strong> '+ lastContributionDateTime +' </strong>';
+			      var userClassificationCount = '0'; //placeholder
+			      classificationCountSpan.innerHTML = '<strong> ' + userClassificationCount + ' </strong>';
+			  	}
+				} else {
+					//Edito la tabla de puntos poniendo que no hay colaboradores aún. Sé el primero y toda la bola
+					scoreboardTable.innerHTML = "<center> Aún no hay colaboradores en este proyecto. Sé el primero </center>";
+				}
+		  	
 			}
 
 	  }
