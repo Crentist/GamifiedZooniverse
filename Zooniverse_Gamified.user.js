@@ -44,6 +44,50 @@
 			return xhttp.responseText;
 		}
 
+		function userIsCollaborator(project, loggedUser) {
+			console.log("Es o no");
+			console.log(project);
+			console.log(loggedUser);
+			if (project.collaborators != undefined) {
+				return ((project.collaborators.find(o => o.zooniverseHandle === loggedUser)) != undefined);
+			}
+			return false;
+		}
+
+		function taskType() {
+			if (document.getElementsByClassName('answer minor-button answer-button').length > 0) return "simpleQuestion";
+			if (document.getElementsByClassName('drawing-tool-button-input').length > 0) return "drawing";
+			return "Not supported";
+		}
+
+		function addEventToButton(project,user) {
+			console.log("PROY");
+			console.log(project);
+			document.getElementsByClassName('continue major-button')[0].addEventListener("click", addEvent, false);	
+			function addEvent() {
+				if ((document.getElementsByClassName('continue major-button')[0].children[0].innerHTML) == 'Done') {
+					//POSTear los puntos. Generar la colaboración, o bien sumar los puntos.
+					//"/projects/" + project.id + "/collaborations"
+					console.log("tarea:");
+					console.log(taskType());
+					console.log(project);
+					if (userIsCollaborator(project,user)) {
+						params = JSON.stringify({"taskType": taskType()});
+
+						//doPostRequest(serverUrl + "/projects/"+project.id+"/collaborations/"+userCollaboration.id+"/increment", params);
+					} else {
+						//Generar la colaboración. Esto será la primera vez
+					}
+				} else if ((document.getElementsByClassName('continue major-button')[0].children[0].innerHTML) == 'Next') {
+					//Sumar los puntos, parciales. Si el Next indica que se pasa a la siguiente tarea, no hacer nada.
+
+					//Cuando es Next, es tanto para pasar a la siguiente pregunta del workflow como para pasar a la siguiente clasificación
+				}
+
+			}			
+		}
+
+
 	  function gameOn() {
 	  	var tableStyle = `element {
 												}
@@ -86,23 +130,18 @@
 	    //Esto por ahí sirve para algo. Agrega un botón que despliega, al costado. Funciona solamente con proyectos que andan, creo, que tienen 'Field Guide'. Por ahí garpa poner los puntos ahí, para que no moleste en otro lado.
 
 	    //document.getElementsByClassName('continue major-button')[0] >> el botón de Next o Done. Adentro tienen un span que tiene el texto que corresponde
-
-	    document.getElementsByClassName('continue major-button')[0].addEventListener("click", function(){
-				if ((document.getElementsByClassName('continue major-button')[0].children[0].innerHTML) == 'Done') {
-					//POSTear los puntos. Generar la colaboración, o bien sumar los puntos.
-					//"/projects/" + project.id + "/collaborations"
-				} else if ((document.getElementsByClassName('continue major-button')[0].children[0].innerHTML) == 'Next') {
-					//Sumar los puntos.
-					//Cuando es Next, es tanto para pasar a la siguiente pregunta del workflow como para pasar a la siguiente clasificación
-				}
-			}); 
+	    //addEventToButton(project, user);
+			//document.getElementsByClassName('continue major-button')[0].addEventListener("change", addEventToButton(project, user)); 
+			
 
 	    //document.getElementsByClassName('drawing-tool-button-input') >> indica que la tarea es de tipo dibujo
+	    //document.getElementsByClassName('answer minor-button answer-button') >> si el tamaño del arreglo es mayor a 0. respuestas pregunta. O sea, es una pregunta común
 
 
 	    //Div + tabla de puntos
       var scoreboardDiv = document.createElement('div');
       scoreboardDiv.style.marginLeft = '1em';
+      scoreboardDiv.style.width = '20%';
       var scoreboardTable = document.createElement("table");
       scoreboardTable.className = 'table';
       scoreboardTable.id = "tablaPuntaje";
@@ -202,7 +241,7 @@
       var milestoneText = document.createElement('font');
       milestoneText.size = '1';
       var milestoneValue = '48'; //Placeholder
-      milestoneText.innerHTML = 'Realizá <strong> ' + milestoneValue + ' </strong> clasificaciones más para la siguiente insignia!';
+      milestoneText.innerHTML = '';//'Realizá <strong> ' + milestoneValue + ' </strong> clasificaciones más para la siguiente insignia!';
 
       nextMilestoneSpan.appendChild(milestoneText);
       badgesDiv.appendChild(nextMilestoneSpan);
@@ -224,28 +263,27 @@
 	  	if (document.getElementsByClassName('site-nav__link')[9] == undefined) {
 	  		//No está logueado, debería para que ande. Poner un aviso en algún lado. Un alert ni da. Estaría bueno uno de esos cartelitos que hoverean. Para esto y para otras cosas
 	  	} else {
-
 		  	var loggedUser = document.getElementsByClassName('site-nav__link')[9].children[0].innerHTML.replace(/"/g,"");
 	  		params = JSON.stringify({"zooniverseHandle": loggedUser});
 				var user = doPostRequest(serverUrl + "/users", params);
-				if (project.collaborators != undefined) {
-			  	if ((project.collaborators.find(o => o.zooniverseHandle === loggedUser)) != undefined) {
-			  		//es colaborador, por lo tanto tengo que llenar el coso de mi colaboración con los valores que correspondan
-			  		//Adicionalmente, que sea colaborador implica que al menos tenga una clasificación
-			      var firstContributionDate = doGetRequest("/users/"+user.id+"/collaboration/"+project.id).created_at;// '01/01/1900'; //placeholder. Un GET a una URL tipo /users/:user_id/collaboration/:project_id. O si no, tengo que filtrar desde acá. created_at es la primera; updated_at es la última
-			      console.log(firstContributionDate);
-			  		sinceSpan.innerHTML = 'Colaborando desde el <strong>' + firstContributionDate + '</strong>';
-			  		lastContributionDateTime = '12 horas'; //placeholder
-			  		lastContributionSpan.innerHTML = 'Última contribución hace: <strong> '+ lastContributionDateTime +' </strong>';
-			      var userClassificationCount = '0'; //placeholder
-			      classificationCountSpan.innerHTML = '<strong> ' + userClassificationCount + ' </strong>';
-			  	}
-				} else {
-					//Edito la tabla de puntos poniendo que no hay colaboradores aún. Sé el primero y toda la bola
-					scoreboardTable.innerHTML = "<center> Aún no hay colaboradores en este proyecto. Sé el primero </center>";
-				}
-		  	
+				if (userIsCollaborator(project, loggedUser)) {
+					//llenar el coso de mi colaboración con los valores que correspondan
+		  		//Adicionalmente, que sea colaborador implica que al menos tenga una clasificación
+		  		var userCollaboration = doGetRequest("/users/"+user.id+"/collaboration/"+project.id);
+		      var firstContributionDate = userCollaboration.created_at;// '01/01/1900'; //placeholder. created_at es la primera; updated_at es la última
+		      console.log(firstContributionDate);
+		  		sinceSpan.innerHTML = 'Colaborando desde el <strong>' + firstContributionDate + '</strong>';
+		  		lastContributionDateTime = '12 horas'; //placeholder
+		  		lastContributionSpan.innerHTML = 'Última contribución hace: <strong> '+ lastContributionDateTime +' </strong>';
+		      var userClassificationCount = '0'; //placeholder
+		      classificationCountSpan.innerHTML = '<strong> ' + userClassificationCount + ' </strong>';
+		  	}
 			}
 
+			if (project.collaborators != undefined) {
+			} else {
+				scoreboardTable.innerHTML = "<center> Aún no hay colaboradores en este proyecto. Sé el primero </center>";
+			}
+		document.getElementsByClassName('task-container')[0].addEventListener("change", addEventToButton(project, user)); 
 	  }
 	}
