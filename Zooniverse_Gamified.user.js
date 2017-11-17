@@ -10,6 +10,7 @@
 //window.addEventListener("load", function (){
 
 	serverUrl = "http://localhost:3000";
+	var tasks = [];
 
   console.log("Welcome to Zooniverse Gamified!");
 
@@ -45,9 +46,6 @@
 		}
 
 		function userIsCollaborator(project, loggedUser) {
-			console.log("Es o no");
-			console.log(project);
-			console.log(loggedUser);
 			if (project.collaborators != undefined) {
 				return ((project.collaborators.find(o => o.zooniverseHandle === loggedUser)) != undefined);
 			}
@@ -60,28 +58,33 @@
 			return "Not supported";
 		}
 
-		function addEventToButton(project,user) {
-			console.log("PROY");
-			console.log(project);
+		function addEventToButton(project, user) {
+			console.log("UGH dale loco");
+			//console.log(project);
+			//console.log(user);
 			document.getElementsByClassName('continue major-button')[0].addEventListener("click", addEvent, false);	
 			function addEvent() {
-				if ((document.getElementsByClassName('continue major-button')[0].children[0].innerHTML) == 'Done') {
-					//POSTear los puntos. Generar la colaboración, o bien sumar los puntos.
-					//"/projects/" + project.id + "/collaborations"
-					console.log("tarea:");
-					console.log(taskType());
+				var buttonText = document.getElementsByClassName('continue major-button')[0].children[0].innerHTML;
+				if (buttonText == 'Done') {
+					//POSTear los puntos. Generar la colaboración si es necesario, y luego sumar los puntos.
 					console.log(project);
-					if (userIsCollaborator(project,user)) {
-						params = JSON.stringify({"taskType": taskType()});
-
-						//doPostRequest(serverUrl + "/projects/"+project.id+"/collaborations/"+userCollaboration.id+"/increment", params);
-					} else {
-						//Generar la colaboración. Esto será la primera vez
+					if (!(userIsCollaborator(project,user))) {
+						params = JSON.stringify({"user_id": user.id, "project_id": project.id});
+						console.log(project.id);
+						console.log(params);
+						doPostRequest(serverUrl + "/projects/"+project.id+"/collaborations", params);
+					} 
+					params = JSON.stringify({"tasks": tasks});
+					var userCollaboration = doGetRequest("/users/"+user.id+"/collaboration/"+project.id);
+					doPostRequest(serverUrl + "/projects/"+project.id+"/collaborations/"+userCollaboration.id+"/increment", params);		
+					tasks = [];			
+				} else if (buttonText == 'Next') {
+					//Agregar el tipo de tarea que se acaba de resolver. Si el Next indica que se pasa a la siguiente tarea, no hacer nada.
+					if (document.getElementsByClassName('classification-summary')[0] == undefined) {
+						tasks.push(taskType());
 					}
-				} else if ((document.getElementsByClassName('continue major-button')[0].children[0].innerHTML) == 'Next') {
-					//Sumar los puntos, parciales. Si el Next indica que se pasa a la siguiente tarea, no hacer nada.
-
-					//Cuando es Next, es tanto para pasar a la siguiente pregunta del workflow como para pasar a la siguiente clasificación
+					console.log("tareas so far:");
+					console.log(tasks);
 				}
 
 			}			
@@ -251,12 +254,10 @@
       taskArea.appendChild(contributionDiv); //El div con lo de mi colaboración
       taskArea.appendChild(contributionDataDiv);
 
-	    console.log(projectName);
 
 	    //POSTeo de una. Si ya existe con ese nombre, me lo devuelve
   		params = JSON.stringify({"name": projectName});
 			var project = doPostRequest(serverUrl + "/projects", params);
-			console.log(project);
 
 	  	//Tengo que traerme los datos del proyecto actual (o sea, levantar el id a partir de lo anterior). A partir de esto, agarrar el colaborador actual de la lista de colaboradores del proyecto, y armar el coso de info de abajo
 
@@ -271,9 +272,8 @@
 		  		//Adicionalmente, que sea colaborador implica que al menos tenga una clasificación
 		  		var userCollaboration = doGetRequest("/users/"+user.id+"/collaboration/"+project.id);
 		      var firstContributionDate = userCollaboration.created_at;// '01/01/1900'; //placeholder. created_at es la primera; updated_at es la última
-		      console.log(firstContributionDate);
 		  		sinceSpan.innerHTML = 'Colaborando desde el <strong>' + firstContributionDate + '</strong>';
-		  		lastContributionDateTime = '12 horas'; //placeholder
+		  		lastContributionDateTime = userCollaboration.updated_at;
 		  		lastContributionSpan.innerHTML = 'Última contribución hace: <strong> '+ lastContributionDateTime +' </strong>';
 		      var userClassificationCount = '0'; //placeholder
 		      classificationCountSpan.innerHTML = '<strong> ' + userClassificationCount + ' </strong>';
@@ -284,6 +284,26 @@
 			} else {
 				scoreboardTable.innerHTML = "<center> Aún no hay colaboradores en este proyecto. Sé el primero </center>";
 			}
-		document.getElementsByClassName('task-container')[0].addEventListener("change", addEventToButton(project, user)); 
+		//document.getElementsByClassName('task-container')[0].addEventListener("change", );
+		addEventToButton(project, user);
+
+		var notAdded = true;
+		var awaiting2 = setInterval(function() { 
+	    var sumario = document.getElementsByClassName('classification-summary')[0];
+	    var markQuest = document.getElementsByClassName('markdown question')[0];
+	    if ((sumario != undefined) && notAdded) {
+	      addEventToButton(project, user);
+	      notAdded = false;
+				var awaiting3 = setInterval(function() { 
+			    var markQuest = document.getElementsByClassName('markdown question')[0];
+			    if (markQuest != undefined) {
+			      addEventToButton(project, user);
+			      clearInterval(awaiting3);
+			    }
+			  }, 100);
+	    } else if (sumario == undefined) {
+	    	notAdded = true;
+	    }
+	  }, 100);
 	  }
 	}
