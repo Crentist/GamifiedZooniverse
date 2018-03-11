@@ -10,23 +10,59 @@
 // @grant       GM.addStyle
 // @grant       GM.getResourceText
 // @grant       GM.getResourceUrl
-// @grant       GM.xmlhttpRequest
+// @grant       GM.setValue
+// @grant       GM.getValue
+// @grant       GM.xmlHttpRequest
 // @grant       unsafeWindow
 // @run-at      document-end
 // ==/UserScript==
 
   window.onload = function() { 
+    console.log("Window loaded. About to execute script");
     executeScript();
-    var elements = document.getElementsByTagName('a');
-    for (var i = 0, len = elements.length; i < len; i++) {
-      elements[i].addEventListener("click", function() {
-        window.onload = function() {
-          executeScript();
-        }
-      });
-    }         
   }
+ 
+    var modalStyle = `
+                    .modal {
+                        display: none; /* Hidden by default */
+                        position: fixed; /* Stay in place */
+                        z-index: 2; /* Sit on top */
+                        padding-top: 5%; /* Location of the box */
+                        left: 0;
+                        top: 0;
+                        width: 100%;
+                        height: 70%;
+                        overflow: auto; /* Enable scroll if needed */
+                        background-color: rgb(0,0,0); /* Fallback color */
+                        background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
+                    }
 
+                    /* Modal Content */
+                    .modal-content {
+                        background-color: #fefefe;
+                        margin: auto;
+                        padding: 20px;
+                        border: 1px solid #888;
+                        width: 95%;
+                        height: 90%;
+                    }
+
+                    /* The Close Button */
+                    .close {
+                        color: #aaaaaa;
+                        float: right;
+                        font-size: 20px;
+                        font-weight: bold;
+                    }
+
+                    .close:hover,
+                    .close:focus {
+                        color: #000;
+                        text-decoration: none;
+                        cursor: pointer;
+                    }
+                 `  
+  
   var formBootstrap = `
 .form-control {
   display: block;
@@ -1423,28 +1459,42 @@ tbody.collapse.show {
   serverUrl = "http://localhost:3000";
   var tasks = [];
 
-  function doGetRequest(url) {
-    var xhttp = GM.xmlhttpRequest({
+  function doGetRequest(url, callback) {
+    GM.xmlHttpRequest({
       method: "GET",
       url: url,
       headers: { "Content-Type": "application/json" },        
-      synchronous: true
+      synchronous: true,
+      onload: function(response) {
+        callback(response);
+      }
     });
-    
-    return xhttp.responseText;
-  }   
+  }  
 
-  function doPostRequest(url, parameters) {
-    var xhttp = GM.xmlhttpRequest({
+  function doPostRequest(url, parameters, callback) {
+    GM.xmlHttpRequest({
       method: "POST",
       url: url,
       data: parameters,
-      headers: { "Content-Type": "application/json" },        
-      synchronous: true
+      headers: { "Content-Type": "application/json" }, 
+      synchronous: true,
+      onload: function(response) {
+        callback(response);
+      }
     });
-    
-    return xhttp.responseText;
   }
+
+  function doDeleteRequest(url, callback) {
+    GM.xmlHttpRequest({
+      method: "DELETE",
+      url: url,
+      headers: { "Content-Type": "application/json" }, 
+      synchronous: true,
+      onload: function(response) {
+        callback(response);
+      }
+    });
+  }  
 
   function loadBootstrap() {
     var link = document.createElement("link");
@@ -1476,11 +1526,8 @@ tbody.collapse.show {
     }, 100);    
   }
 
-  function index_page() {
-    window.location.href == "https://www.zooniverse.org/";
-  }
-
   function create_login_form() {
+    console.log("Creating login form");
     var form = document.createElement("form");
     form.id = "loginForm";
     
@@ -1492,10 +1539,11 @@ tbody.collapse.show {
     handleLabel.style = "color:black";
     
     var handleInput = document.createElement("input");
+    handleInput.id = "handleInput";
     handleInput.className = "form-control";
     handleInput.placeholder = "Ingrese nombre de usuario";
    
-    //handleDiv.appendChild(handleLabel);
+    handleDiv.appendChild(handleLabel);
     handleDiv.appendChild(handleInput);
     
     var passwordDiv = document.createElement("div");
@@ -1506,6 +1554,7 @@ tbody.collapse.show {
     passwordLabel.style = "color:black";
     
     var passwordInput = document.createElement("input");
+    passwordInput.id = "passwordInput";
     passwordInput.className = "form-control";
     passwordInput.placeholder = "Contraseña";
     
@@ -1522,13 +1571,46 @@ tbody.collapse.show {
     form.appendChild(submitBtn);
    
     submitBtn.addEventListener("click", function() {
-      //POST a login  
+      var handleValue = document.getElementById("handleInput").value;
+      var passwordValue = document.getElementById("passwordInput").value;
+      
+      var userData = {
+        "handle": handleValue,
+        "password": passwordValue
+      }
+      
+      var params = JSON.stringify({"user": userData});
+      doPostRequest(serverUrl + "/login", params, function(response) {
+        jsonResponse = JSON.parse(response.response);
+        if (response.status == 200) {
+          console.log("User logged in");
+          var user_id = jsonResponse["user"]["id"];
+          var user_token = jsonResponse["user"]["token"];
+          var user_handle = jsonResponse["user"]["handle"];
+          sessionStorage.removeItem("user_id");
+          sessionStorage.removeItem("user_token");
+          sessionStorage.removeItem("user_handle");
+          sessionStorage.setItem("user_id", user_id);
+          sessionStorage.setItem("user_token", user_token);
+          sessionStorage.setItem("user_handle", user_handle);
+          location.reload();
+          //Lo mismo que en el registro
+        }
+        else {
+          //Mirar los errores y cambiar los campos
+          //jsonResponseErrors.each
+          console.log(jsonResponse["errors"]);
+          //Un iterador con un case/switch ???
+        }
+      });
+
     });    
      
     return form;
   }
 
   function create_register_form() {
+    console.log("Creating register form");
     var form = document.createElement("form");
     form.id = "registerForm";
     
@@ -1540,11 +1622,27 @@ tbody.collapse.show {
     handleLabel.style = "color:black";
     
     var handleInput = document.createElement("input");
+    handleInput.id = "handleInput";
     handleInput.className = "form-control";
     handleInput.placeholder = "Ingrese nombre de usuario";
    
     handleDiv.appendChild(handleLabel);
     handleDiv.appendChild(handleInput);
+    
+    var emailDiv = document.createElement("div");
+    emailDiv.className = "form-group"; 
+    
+    var emailLabel = document.createElement("label");    
+    emailLabel.textContent = "E-Mail";
+    emailLabel.style = "color:black";
+    
+    var emailInput = document.createElement("input");
+    emailInput.id = "emailInput"
+    emailInput.className = "form-control";
+    emailInput.placeholder = "Ingrese su correo electrónico";    
+
+    emailDiv.appendChild(emailLabel);
+    emailDiv.appendChild(emailInput);    
     
     var passwordDiv = document.createElement("div");
     passwordDiv.className = "form-group";
@@ -1554,7 +1652,9 @@ tbody.collapse.show {
     passwordLabel.style = "color:black";
     
     var passwordInput = document.createElement("input");
+    passwordInput.id = "passwordInput";
     passwordInput.className = "form-control";
+    passwordInput.type = "password"
     passwordInput.placeholder = "Contraseña";
     
     passwordDiv.appendChild(passwordLabel);
@@ -1569,6 +1669,7 @@ tbody.collapse.show {
     
     var confirmPassInput = document.createElement("input");
     confirmPassInput.className = "form-control";
+    confirmPassInput.type = "password"
     confirmPassInput.placeholder = "Vuelva a ingresar la contraseña";
     
     confirmPassDiv.appendChild(confirmPassLabel);
@@ -1580,10 +1681,41 @@ tbody.collapse.show {
     submitBtn.textContent = "Registro";
     
     submitBtn.addEventListener("click", function() {
-      //POST a registrar  
+      var handleValue = document.getElementById("handleInput").value;
+      var emailValue = document.getElementById("emailInput").value;
+      var passwordValue = document.getElementById("passwordInput").value;
+      
+      var userData = {
+        "handle": handleValue,
+        "email": emailValue,
+        "password": passwordValue
+      };
+      
+      var params = JSON.stringify({"user": userData});
+      doPostRequest(serverUrl + "/register", params, function(response) {
+        jsonResponse = JSON.parse(response.response)
+        if (response.status == 200) {
+         //Cerrar el modal, y toda la bola en el DOM para mostrar las cosas de usuario logueado
+          console.log("User successfully registered");
+          var user_token = jsonResponse["user"]["token"];
+          sessionStorage.removeItem("user_token");
+          sessionStorage.setItem("user_token", user_token);
+          location.reload();
+          //var modal = document.getElementById("gZooModalWrapper");
+          //modal.style.display = "none";
+          //Cambiar lo que va en el modal, o poner algo distinto en GZoo
+        }
+        else {
+          //Mirar los errores y cambiar los campos
+          jsonResponseErrors = JSON.parse(response.response)["errors"];
+          console.log(jsonResponse);
+          //Un iterador con un case/switch ???
+        }
+      });
     });
     
     form.appendChild(handleDiv);
+    form.appendChild(emailDiv);
     form.appendChild(passwordDiv);
     form.appendChild(confirmPassDiv);
     form.appendChild(submitBtn);
@@ -1592,6 +1724,7 @@ tbody.collapse.show {
   }
 
   function create_nav_tabs() {
+    console.log("Creating nav tabs");
     var navigation = document.createElement("nav");
     navigation.style = "display: flex"; //No sé por qué no funciona desde la clase. Un override en algún lugar, maldición
     
@@ -1639,59 +1772,17 @@ tbody.collapse.show {
     return navigation;
   }
 
-  function add_gzoo_to_navbar() {
+  function add_gzoo_to_navbar(callback) {
     console.log("About to stick GZoo's button in the navbar");
-    
-    var modalStyle = `
-                    .modal {
-                        display: none; /* Hidden by default */
-                        position: fixed; /* Stay in place */
-                        z-index: 2; /* Sit on top */
-                        padding-top: 5%; /* Location of the box */
-                        left: 0;
-                        top: 0;
-                        width: 100%;
-                        height: 70%;
-                        overflow: auto; /* Enable scroll if needed */
-                        background-color: rgb(0,0,0); /* Fallback color */
-                        background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
-                    }
-
-                    /* Modal Content */
-                    .modal-content {
-                        background-color: #fefefe;
-                        margin: auto;
-                        padding: 20px;
-                        border: 1px solid #888;
-                        width: 95%;
-                        height: 90%;
-                    }
-
-                    /* The Close Button */
-                    .close {
-                        color: #aaaaaa;
-                        float: right;
-                        font-size: 20px;
-                        font-weight: bold;
-                    }
-
-                    .close:hover,
-                    .close:focus {
-                        color: #000;
-                        text-decoration: none;
-                        cursor: pointer;
-                    }
-                 `
-    addStyle(modalStyle);
-    addStyle(formBootstrap);
-    addStyle(btsNavs);
-    
+        
     var modalWrapper = document.createElement('div');
     modalWrapper.id = "gZooModalWrapper";
     modalWrapper.className = "modal";
     modalWrapper.className += " col-4 offset-4";
+    modalWrapper.style.display = "none"; 
     
     var gZooModal = document.createElement('div');
+    gZooModal.id = "gZooModal";
     gZooModal.className = "modal-content";
     
     var closeModal = document.createElement('span');
@@ -1711,9 +1802,7 @@ tbody.collapse.show {
     gZooButton.appendChild(gZooSpan);
     gZooSpan.appendChild(textSpan);
     
-    gZooModal.appendChild(create_nav_tabs());
-    
-    gZooModal.appendChild(create_login_form());
+    callback(gZooModal);
     
     console.log("Stuff created");
     gZooButton.onclick = function() {
@@ -1737,6 +1826,17 @@ tbody.collapse.show {
     
     console.log("Events attached");
     
+    if (!(document.querySelector(".account-bar") == undefined)) {
+      document.querySelector(".account-bar").prepend(gZooButton);
+      console.log("Attached GZoo thingy into the account bar");      
+    }
+    else {
+      if (!(document.querySelector(".login-bar") == undefined)) {
+        document.querySelector(".login-bar").prepend(gZooButton);
+        console.log("Attached GZoo thingy into the login bar");      
+      }
+    }
+    
     wait_for_element("account-bar", function() {
       document.querySelector(".account-bar").prepend(gZooButton);
       console.log("Attached GZoo thingy into the thing");
@@ -1744,32 +1844,84 @@ tbody.collapse.show {
   }
 
   function project_landing_page() {
-    /^https:\/\/www\.zooniverse\.org\/projects\/.+\/.+$/.test(window.location.href)
+    return /^https:\/\/www\.zooniverse\.org\/projects\/.+\/.+$/.test(window.location.href);
   }
 
   function classify_page() {
-    window.location.href.indexOf('classify') > -1
+    return (window.location.href.indexOf('classify') > -1);
+  }
+
+  function index_page() {
+    return (window.location.href == "https://www.zooniverse.org/");
+  }
+
+  function user_is_logged_in() {
+    var user_token = sessionStorage.getItem("user_token");
+    if (user_token == undefined) {
+      return false;  
+    }
+    return true;     
+  }
+
+  function user_site_logged_in() {
+    return (document.getElementsByClassName('modal-form-trigger site-nav__modal secret-button').length != 0);
+  }
+
+  function user_site_username() {
+    if (user_site_logged_in()) {
+      return (document.getElementsByClassName('modal-form-trigger site-nav__modal secret-button').children[0].children[0].textContent);
+    }
+    else {
+      return "";
+    }
+  }
+
+  function accounts_not_linked() {
+    user_id = sessionStorage.getItem("user_id");
+    //Acá podría usar el token
+    doGetRequest(serverUrl + "/users/"+user_id+"/sites_usernames", function(response) {
+      jsonResponse = JSON.parse(response.response);
+      if ((jsonResponse["sites_usernames"] == undefined) || (jsonResponse["sites_usernames"]["zooniverse.org"] == undefined) || !((jsonResponse["sites_usernames"]["zooniverse.org"]).includes(user_site_username()))) {
+        return true;    
+      }
+      else {
+        return false;
+      }
+    });
   }
 
   function executeScript() {
     loadBootstrap();
     console.log("Welcome to Zooniverse Gamified!");
 
+    //console.log("El token:");
+    //var eltoken = sessionStorage.getItem("user_token");
+    //console.log(eltoken);
+    
+
     //En la página de inicio
 
     if (index_page()) {
-      if (user_is_logged_in()) {
+      console.log("In Zooniverse's index page");
+      var unDiv = document.createElement("div");
+      unDiv.id = "userSiteCollaboration";
+      unDiv.className = "col-3 offset-8";
+      unDiv.style = "float: right";
+      //document.querySelector(".home-page-for-user__content").prepend(unDiv);
+      if (user_is_logged_in() && user_site_logged_in()) {
         //Módulo con datos del sitio (Zooniverse)
         
         
         //Lo siguiente pone un div más o menos coherente, mirar luego
-        unDiv = document.createElement("div");
+        var unDiv = document.createElement("div");
+        unDiv.id = "userSiteCollaboration";
         unDiv.className = "col-3 offset-8";
         unDiv.style = "float: right";
         document.querySelector(".home-page-for-user__content").prepend(unDiv);
       }
       else {
         //Nada. O bien, un coso para que loguee
+
       }
 
     }
@@ -1777,18 +1929,133 @@ tbody.collapse.show {
     //En el navbar
       //Si está logueado, si no lo está
     if (document.getElementById("gZooAccount") == undefined) {
-      add_gzoo_to_navbar();
-    }
+      console.log("GZoo navbar button is not defined");
+      addStyle(modalStyle);
+      addStyle(formBootstrap);
+      addStyle(btsNavs);
+      if (user_is_logged_in()) {
+        console.log("User logged in. Add GZoo navbar thing");
+        add_gzoo_to_navbar(function(gZooModal) {
+          //Insertar un row con un <p> que diga qué usuario está logueado
 
+          var loggedRow = document.createElement('div');
+          loggedRow.className = "row";
+          var loggedCol = document.createElement('div');
+          loggedCol.className = "col-8 offset-2";
+          var loggedP = document.createElement('p');
+          var user_handle = sessionStorage.getItem("user_handle");
+          loggedP.textContent = "Logueado como "+user_handle;
+
+          loggedCol.appendChild(loggedP);
+          loggedRow.appendChild(loggedCol);
+
+          gZooModal.appendChild(loggedRow);
+          //Lo siguiente, si está logueado en Zooniverse y si las cuentas no están linkeadas
+          if (user_site_logged_in()) {
+            if (accounts_not_linked()) {
+              var connectRow = document.createElement('div');
+              connectRow.className = "row";
+              var connectCol = document.createElement('div');
+              connectCol.className = "col-8 offset-2";
+              var connectP = document.createElement('p');
+              connectP.textContent = "Las cuentas no están vinculadas";
+              var connectButton = document.createElement('button');
+              connectButton.textContent = "Vincular cuentas";
+              
+              connectButton.addEventListener("click", function() {
+                user_id = sessionStorage.getItem("user_id");
+                params = JSON.stringify({"site": "zooniverse.org", "username": user_site_username()});
+
+                doPostRequest(serverUrl+"/users"+user_id+"site_username", params, function(response) {
+                  jsonResponse = JSON.parse(response.response);
+                  console.log(response);
+                  if (response.status == 201) {
+                    //location.reload();
+                  }
+                  else {
+                    //Alguna especie de error
+                  }
+                });
+              });
+              
+              connectCol.appendChild(connectP);
+              connectRow.appendChild(connectCol);
+              connectRow.appendChild(connectButton);
+
+              gZooModal.appendChild(connectRow); 
+
+            }
+            else {
+              //Está logueado y las cuentas están linkeadas
+            }
+          }
+          else {
+            //Por favor ingrese sesión en Zooniverse
+            var askLoginRow = document.createElement('div');
+            askLoginRow.className = "row";
+            var askLoginDiv = document.createElement('div');
+            askLoginDiv.className = "col-8 offset-2";
+            var askLoginP = document.createElement('p');
+            askLoginP.textContent = "Por favor, ingrese sesión en el sitio";
+
+            askLoginDiv.appendChild(askLoginP);
+            askLoginRow.appendChild(askLoginDiv);
+
+            gZooModal.appendChild(askLoginRow);
+          }
+
+          var logoutRow = document.createElement('div');
+          logoutRow.className = "row";
+          var logoutCol = document.createElement('div');
+          logoutCol.className = "col-8 offset-2";
+          var logoutButton = document.createElement('button');
+          logoutButton.textContent = "Cerrar sesión";
+
+
+          logoutButton.addEventListener("click", function() {
+            doDeleteRequest(serverUrl+"/logout", function(response) {
+              jsonResponse = JSON.parse(response.response);
+              console.log(response);
+              if (response.status == 200) {
+                console.log("User logged out");
+                sessionStorage.removeItem("user_id");
+                sessionStorage.removeItem("user_token");
+                sessionStorage.removeItem("user_handle");
+                location.reload();
+              }
+            });
+          });
+
+          logoutCol.appendChild(logoutButton);
+          logoutRow.appendChild(logoutCol);
+
+          gZooModal.appendChild(logoutRow);
+
+      //Agregar botón de logout de GZoo
+        //El botón de GZoo en el navbar tendría que mostrar otras cosas
+          //Logout
+          //El perfil?
+          //Linkear la cuenta de Zooniverse con la de GZoo
+          
+        });
+      }
+      else {
+        add_gzoo_to_navbar(function(gZooModal) {
+          gZooModal.appendChild(create_nav_tabs());
+          gZooModal.appendChild(create_login_form());   
+        });
+      }
+    }
     //En la pantalla principal del proyecto
 
     if (project_landing_page()) {
+      console.log("In a project's landing page");
 
     }
 
     //En la clasificación de un proyecto. Funcionalidad específica para esa pantalla
     if (classify_page()) {
-      console.log("Classifying")
+      console.log("In a project's classification page");
       var awaiting = setInterval(function() { //Se podrá hacer con Promise?
         var classifierElement = document.querySelector('.classifier');
         if (classifierElement != undefined) {
@@ -1986,7 +2253,7 @@ tbody.collapse.show {
 
         //Tengo que traerme los datos del proyecto actual (o sea, levantar el id a partir de lo anterior). A partir de esto, agarrar el colaborador actual de la lista de colaboradores del proyecto, y armar el coso de info de abajo
 
-        if (document.getElementsByClassName('site-nav__link')[9] == undefined) {
+        if (!(user_site_logged_in())) {
           //No está logueado, debería para que ande. Poner un aviso en algún lado. Un alert ni da. Estaría bueno uno de esos cartelitos que hoverean. Para esto y para otras cosas
         } else {
           var loggedUser = document.getElementsByClassName('site-nav__link')[9].children[0].innerHTML.replace(/"/g,"");
