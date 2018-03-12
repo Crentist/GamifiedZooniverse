@@ -1505,13 +1505,13 @@ tbody.collapse.show {
   }
 
   function addStyle(css) {
-      var head = document.head || document.getElementsByTagName('head')[0];
-      if (head) {
-          var style = document.createElement("style");
-          style.type = "text/css";
-          style.appendChild(document.createTextNode(css));
-          head.appendChild(style);
-      } 
+    var head = document.head || document.getElementsByTagName('head')[0];
+    if (head) {
+      var style = document.createElement("style");
+      style.type = "text/css";
+      style.appendChild(document.createTextNode(css));
+      head.appendChild(style);
+    } 
   } 
 
   function wait_for_element(className, action) {
@@ -1869,7 +1869,7 @@ tbody.collapse.show {
 
   function user_site_username() {
     if (user_site_logged_in()) {
-      return (document.getElementsByClassName('modal-form-trigger site-nav__modal secret-button').children[0].children[0].textContent);
+      return (document.getElementsByClassName('modal-form-trigger site-nav__modal secret-button')[0].children[0].children[0].textContent);
     }
     else {
       return "";
@@ -1881,11 +1881,13 @@ tbody.collapse.show {
     //Acá podría usar el token
     doGetRequest(serverUrl + "/users/"+user_id+"/sites_usernames", function(response) {
       jsonResponse = JSON.parse(response.response);
+      console.log("are accounts linked?");
+      console.log(jsonResponse);
       if ((jsonResponse["sites_usernames"] == undefined) || (jsonResponse["sites_usernames"]["zooniverse.org"] == undefined) || !((jsonResponse["sites_usernames"]["zooniverse.org"]).includes(user_site_username()))) {
-        return true;    
+        sessionStorage.setItem("linked", false);
       }
       else {
-        return false;
+        sessionStorage.setItem("linked", true);
       }
     });
   }
@@ -1894,11 +1896,119 @@ tbody.collapse.show {
     loadBootstrap();
     console.log("Welcome to Zooniverse Gamified!");
 
-    //console.log("El token:");
-    //var eltoken = sessionStorage.getItem("user_token");
-    //console.log(eltoken);
-    
+    //En el navbar
+    if (document.getElementById("gZooAccount") == undefined) {
+      console.log("GZoo navbar button is not defined");
+      addStyle(modalStyle);
+      addStyle(formBootstrap);
+      addStyle(btsNavs);
+      if (user_is_logged_in()) {
+        console.log("User logged in. Add GZoo navbar thing");
+        add_gzoo_to_navbar(function(gZooModal) {
+          //Insertar un row con un <p> que diga qué usuario está logueado
 
+          var loggedRow = document.createElement('div');
+          loggedRow.className = "row";
+          var loggedCol = document.createElement('div');
+          loggedCol.className = "col-8 offset-2";
+          var loggedP = document.createElement('p');
+          var user_handle = sessionStorage.getItem("user_handle");
+          loggedP.textContent = "Logueado como "+user_handle;
+
+          loggedCol.appendChild(loggedP);
+          loggedRow.appendChild(loggedCol);
+
+          gZooModal.appendChild(loggedRow);
+          //Lo siguiente, si está logueado en Zooniverse y si las cuentas no están linkeadas
+          if (user_site_logged_in()) {
+            console.log("User logged in in Zooniverse");
+            accounts_not_linked();
+            var linked = sessionStorage.getItem("linked");
+            if (linked == "false") {
+              console.log("Accounts are not linked");
+              var connectRow = document.createElement('div');
+              connectRow.className = "row";
+              var connectCol = document.createElement('div');
+              connectCol.className = "col-8 offset-2";
+              var connectP = document.createElement('p');
+              connectP.textContent = "Las cuentas no están vinculadas";
+              var connectButton = document.createElement('button');
+              connectButton.textContent = "Vincular cuentas";
+              
+              connectButton.addEventListener("click", function() {
+                user_id = sessionStorage.getItem("user_id");
+                params = JSON.stringify({"site": "zooniverse.org", "username": user_site_username()});
+
+                doPostRequest(serverUrl+"/users/"+user_id+"/site_username", params, function(response) {
+                  jsonResponse = JSON.parse(response.response);
+                  console.log(jsonResponse);
+                  if (response.status == 201) {
+                    //location.reload();
+                  }
+                  else {
+                    //Alguna especie de error
+                  }
+                });
+              });
+              
+              connectCol.appendChild(connectP);
+              connectCol.appendChild(connectButton);
+              connectRow.appendChild(connectCol);
+              
+              gZooModal.appendChild(connectRow); 
+            }
+            else {
+              console.log("Accounts are linked");
+              //Está logueado y las cuentas están linkeadas
+            }
+          }
+          else {
+            //Por favor ingrese sesión en Zooniverse
+            var askLoginRow = document.createElement('div');
+            askLoginRow.className = "row";
+            var askLoginDiv = document.createElement('div');
+            askLoginDiv.className = "col-8 offset-2";
+            var askLoginP = document.createElement('p');
+            askLoginP.textContent = "Por favor, ingrese sesión en el sitio";
+
+            askLoginDiv.appendChild(askLoginP);
+            askLoginRow.appendChild(askLoginDiv);
+
+            gZooModal.appendChild(askLoginRow);
+          }
+
+          var logoutRow = document.createElement('div');
+          logoutRow.className = "row";
+          var logoutCol = document.createElement('div');
+          logoutCol.className = "col-8 offset-2";
+          var logoutButton = document.createElement('button');
+          logoutButton.textContent = "Cerrar sesión";
+
+          logoutButton.addEventListener("click", function() {
+            sessionStorage.removeItem("user_id");
+            sessionStorage.removeItem("user_token");
+            sessionStorage.removeItem("user_handle");
+            location.reload();
+          });
+
+          logoutCol.appendChild(logoutButton);
+          logoutRow.appendChild(logoutCol);
+          
+          gZooModal.appendChild(document.createElement("br"));
+          gZooModal.appendChild(logoutRow);
+          
+          //El botón de GZoo en el navbar tendría que mostrar otras cosas
+          //El perfil?
+        });
+      }
+      else {
+        add_gzoo_to_navbar(function(gZooModal) {
+          gZooModal.appendChild(create_nav_tabs());
+          gZooModal.appendChild(create_login_form());   
+        });
+      }
+    }
+    
     //En la página de inicio
 
     if (index_page()) {
@@ -1925,127 +2035,7 @@ tbody.collapse.show {
       }
 
     }
-
-    //En el navbar
-      //Si está logueado, si no lo está
-    if (document.getElementById("gZooAccount") == undefined) {
-      console.log("GZoo navbar button is not defined");
-      addStyle(modalStyle);
-      addStyle(formBootstrap);
-      addStyle(btsNavs);
-      if (user_is_logged_in()) {
-        console.log("User logged in. Add GZoo navbar thing");
-        add_gzoo_to_navbar(function(gZooModal) {
-          //Insertar un row con un <p> que diga qué usuario está logueado
-
-          var loggedRow = document.createElement('div');
-          loggedRow.className = "row";
-          var loggedCol = document.createElement('div');
-          loggedCol.className = "col-8 offset-2";
-          var loggedP = document.createElement('p');
-          var user_handle = sessionStorage.getItem("user_handle");
-          loggedP.textContent = "Logueado como "+user_handle;
-
-          loggedCol.appendChild(loggedP);
-          loggedRow.appendChild(loggedCol);
-
-          gZooModal.appendChild(loggedRow);
-          //Lo siguiente, si está logueado en Zooniverse y si las cuentas no están linkeadas
-          if (user_site_logged_in()) {
-            if (accounts_not_linked()) {
-              var connectRow = document.createElement('div');
-              connectRow.className = "row";
-              var connectCol = document.createElement('div');
-              connectCol.className = "col-8 offset-2";
-              var connectP = document.createElement('p');
-              connectP.textContent = "Las cuentas no están vinculadas";
-              var connectButton = document.createElement('button');
-              connectButton.textContent = "Vincular cuentas";
-              
-              connectButton.addEventListener("click", function() {
-                user_id = sessionStorage.getItem("user_id");
-                params = JSON.stringify({"site": "zooniverse.org", "username": user_site_username()});
-
-                doPostRequest(serverUrl+"/users"+user_id+"site_username", params, function(response) {
-                  jsonResponse = JSON.parse(response.response);
-                  console.log(response);
-                  if (response.status == 201) {
-                    //location.reload();
-                  }
-                  else {
-                    //Alguna especie de error
-                  }
-                });
-              });
-              
-              connectCol.appendChild(connectP);
-              connectRow.appendChild(connectCol);
-              connectRow.appendChild(connectButton);
-
-              gZooModal.appendChild(connectRow); 
-
-            }
-            else {
-              //Está logueado y las cuentas están linkeadas
-            }
-          }
-          else {
-            //Por favor ingrese sesión en Zooniverse
-            var askLoginRow = document.createElement('div');
-            askLoginRow.className = "row";
-            var askLoginDiv = document.createElement('div');
-            askLoginDiv.className = "col-8 offset-2";
-            var askLoginP = document.createElement('p');
-            askLoginP.textContent = "Por favor, ingrese sesión en el sitio";
-
-            askLoginDiv.appendChild(askLoginP);
-            askLoginRow.appendChild(askLoginDiv);
-
-            gZooModal.appendChild(askLoginRow);
-          }
-
-          var logoutRow = document.createElement('div');
-          logoutRow.className = "row";
-          var logoutCol = document.createElement('div');
-          logoutCol.className = "col-8 offset-2";
-          var logoutButton = document.createElement('button');
-          logoutButton.textContent = "Cerrar sesión";
-
-
-          logoutButton.addEventListener("click", function() {
-            doDeleteRequest(serverUrl+"/logout", function(response) {
-              jsonResponse = JSON.parse(response.response);
-              console.log(response);
-              if (response.status == 200) {
-                console.log("User logged out");
-                sessionStorage.removeItem("user_id");
-                sessionStorage.removeItem("user_token");
-                sessionStorage.removeItem("user_handle");
-                location.reload();
-              }
-            });
-          });
-
-          logoutCol.appendChild(logoutButton);
-          logoutRow.appendChild(logoutCol);
-
-          gZooModal.appendChild(logoutRow);
-
-      //Agregar botón de logout de GZoo
-        //El botón de GZoo en el navbar tendría que mostrar otras cosas
-          //Logout
-          //El perfil?
-          //Linkear la cuenta de Zooniverse con la de GZoo
-          
-        });
-      }
-      else {
-        add_gzoo_to_navbar(function(gZooModal) {
-          gZooModal.appendChild(create_nav_tabs());
-          gZooModal.appendChild(create_login_form());   
-        });
-      }
-    }
+    
     //En la pantalla principal del proyecto
 
     if (project_landing_page()) {
