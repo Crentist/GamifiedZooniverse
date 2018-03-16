@@ -1590,10 +1590,16 @@ tbody.collapse.show {
           sessionStorage.removeItem("user_id");
           sessionStorage.removeItem("user_token");
           sessionStorage.removeItem("user_handle");
+          sessionStorage.removeItem("user_data");
           sessionStorage.setItem("user_id", user_id);
           sessionStorage.setItem("user_token", user_token);
           sessionStorage.setItem("user_handle", user_handle);
+          sessionStorage.setItem("user_data", JSON.stringify(jsonResponse["user"]))
           location.reload();
+          console.log("Los valores guardados son:");
+          console.log(sessionStorage.getItem("user_id"));
+          console.log(sessionStorage.getItem("user_token"));
+          console.log(sessionStorage.getItem("user_handle"));
           //Lo mismo que en el registro
         }
         else {
@@ -1698,8 +1704,14 @@ tbody.collapse.show {
          //Cerrar el modal, y toda la bola en el DOM para mostrar las cosas de usuario logueado
           console.log("User successfully registered");
           var user_token = jsonResponse["user"]["token"];
+          sessionStorage.removeItem("user_id");
           sessionStorage.removeItem("user_token");
+          sessionStorage.removeItem("user_handle");
+          sessionStorage.removeItem("user_data");
+          sessionStorage.setItem("user_id", user_id);
           sessionStorage.setItem("user_token", user_token);
+          sessionStorage.setItem("user_handle", user_handle);
+          sessionStorage.setItem("user_data", JSON.stringify(jsonResponse["user"]))
           location.reload();
           //var modal = document.getElementById("gZooModalWrapper");
           //modal.style.display = "none";
@@ -1855,6 +1867,10 @@ tbody.collapse.show {
     return (window.location.href == "https://www.zooniverse.org/");
   }
 
+  function site_url() {
+    return window.location.host
+  }
+
   function user_is_logged_in() {
     var user_token = sessionStorage.getItem("user_token");
     if (user_token == undefined) {
@@ -1876,6 +1892,48 @@ tbody.collapse.show {
     }
   }
 
+  function current_project_name() {
+    return document.getElementsByClassName("sc-cSHVUG MmxFZ")[0].children[0].textContent;
+  }
+
+  function user_not_joined() {
+    wait_for_element("sc-cSHVUG", function() {
+      doGetRequest(serverUrl+"/projects", function(response) {
+        jsonResponse = JSON.parse(response.response);
+        sessionStorage.setItem("projects", JSON.stringify(jsonResponse));
+        var not_found = true;
+        console.log("Projects:");
+        console.log(jsonResponse);
+        if (jsonResponse.length > 0) {
+          var i = 0;
+
+          while ((not_found) && (i < jsonResponse.length)) {
+            if (jsonResponse[i]["name"] == current_project_name()) {
+              not_found = false;
+              var project = jsonResponse[i];
+            }
+            i++;
+          }
+          if (!not_found) {
+            var collaborators = project["collaborators"];
+            var i = 0;
+            var not_found = true;
+            var user_id = sessionStorage.getItem("user_id");
+            while ((not_found) && (i < collaborators.length)) {
+              if (collaborators[i]["id"] == user_id) {
+                not_found = false;
+              }
+              i++;
+            }
+          }
+        }
+
+        sessionStorage.removeItem("user_not_joined");
+        sessionStorage.setItem("user_not_joined", not_found);
+      });
+    });
+  }
+
   function accounts_not_linked() {
     user_id = sessionStorage.getItem("user_id");
     //Acá podría usar el token
@@ -1883,7 +1941,7 @@ tbody.collapse.show {
       jsonResponse = JSON.parse(response.response);
       console.log("are accounts linked?");
       console.log(jsonResponse);
-      if ((jsonResponse["sites_usernames"] == undefined) || (jsonResponse["sites_usernames"]["zooniverse.org"] == undefined) || !((jsonResponse["sites_usernames"]["zooniverse.org"]).includes(user_site_username()))) {
+      if ((jsonResponse["sites_usernames"] == undefined) || (jsonResponse["sites_usernames"][site_url()] == undefined) || !((jsonResponse["sites_usernames"][site_url()]).includes(user_site_username()))) {
         sessionStorage.setItem("linked", false);
       }
       else {
@@ -1895,6 +1953,11 @@ tbody.collapse.show {
   function executeScript() {
     loadBootstrap();
     console.log("Welcome to Zooniverse Gamified!");
+
+    console.log("EXECUTE SCRIPT. Los valores guardados son:");
+    console.log(sessionStorage.getItem("user_id"));
+    console.log(sessionStorage.getItem("user_token"));
+    console.log(sessionStorage.getItem("user_handle"));
 
     //En el navbar
     if (document.getElementById("gZooAccount") == undefined) {
@@ -1937,7 +2000,7 @@ tbody.collapse.show {
               
               connectButton.addEventListener("click", function() {
                 user_id = sessionStorage.getItem("user_id");
-                params = JSON.stringify({"site": "zooniverse.org", "username": user_site_username()});
+                params = JSON.stringify({"site": site_url(), "username": user_site_username()});
 
                 doPostRequest(serverUrl+"/users/"+user_id+"/site_username", params, function(response) {
                   jsonResponse = JSON.parse(response.response);
@@ -1960,6 +2023,15 @@ tbody.collapse.show {
             else {
               console.log("Accounts are linked");
               //Está logueado y las cuentas están linkeadas
+              var profileDiv = document.createElement("div");
+              profileDiv.id = "profileDiv";
+              profileDiv.className = "container";
+              profileDiv.style.borderStyle = "dotted";
+              profileDiv.style.minHeight = "100px";
+              coso.id = "1111111223";
+              gZooModal.appendChild(profileDiv);
+              
+              //<div class="container" style="border-style: dotted;min-height: 100px;"></div>
             }
           }
           else {
@@ -2040,6 +2112,55 @@ tbody.collapse.show {
 
     if (project_landing_page()) {
       console.log("In a project's landing page");
+      user_not_joined();
+      var not_joined = sessionStorage.getItem("user_not_joined");
+      if ((user_is_logged_in()) && (not_joined == "true")) { 
+        console.log("User logged in and not joined");
+        wait_for_element("project-home-page__call-to-action", function() {
+          var buttonsDiv = document.querySelector(".project-home-page__call-to-action");
+          var joinButton = document.createElement("button");
+          joinButton.textContent = "Unirse al proyecto en GZoo";
+
+          joinButton.addEventListener("click", function() {
+            params = JSON.stringify({"project": current_project_name(), "site": "zooniverse.org"});
+            var user_id = sessionStorage.getItem("user_id");
+            doPostRequest(serverUrl+"/users/"+user_id+"/join_project", params, function(response) {
+              // >>>>>>>> CONTINUE HERE
+              location.reload(); //O algo que no necesariamente recargue todo
+            });
+          });
+
+          buttonsDiv.appendChild(joinButton);
+          console.log("Attached Join button");
+        });     
+      }
+      else {
+        if (!(user_is_logged_in())) {
+          console.log("Please log in.")
+          wait_for_element("project-home-page__call-to-action", function() {
+            var buttonsDiv = document.querySelector(".project-home-page__call-to-action");
+            var joinButton = document.createElement("button");
+            joinButton.disabled = true;
+            joinButton.textContent = "Ingrese sesión en GZoo";
+            buttonsDiv.appendChild(joinButton);
+            console.log("Attached Join button");
+          });            
+        }
+        else {
+          console.log("Joined.")
+          wait_for_element("project-home-page__call-to-action", function() {
+            var buttonsDiv = document.querySelector(".project-home-page__call-to-action");
+            var joinButton = document.createElement("button");
+            joinButton.disabled = true;
+            joinButton.textContent = "Unido!";
+            buttonsDiv.appendChild(joinButton);
+            console.log("Attached Join button");
+          }); 
+
+
+
+        }
+      }
 
     }
 
