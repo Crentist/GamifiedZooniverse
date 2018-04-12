@@ -1,8 +1,9 @@
-﻿// ==UserScript==
+// ==UserScript==
 // @name        Zooniverse Gamified
 // @resource CSS https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css
 // @require     https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js
 // @require     https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js
+// @resource    estilo_navs estilos.css
 // @namespace   colaboratorio
 // @description Adds a layer of gamification to Zooniverse
 // @include     *://www.zooniverse.org/*
@@ -17,11 +18,12 @@
 // @run-at      document-end
 // ==/UserScript==
 
-  window.onload = function() { 
+  window.onload = function() {
     console.log("Window loaded. About to execute script");
+    add_click_events();
     executeScript();
   }
- 
+
     var modalStyle = `
                     .modal {
                         display: none; /* Hidden by default */
@@ -61,8 +63,8 @@
                         text-decoration: none;
                         cursor: pointer;
                     }
-                 `  
-  
+                 `
+
   var formBootstrap = `
 .form-control {
   display: block;
@@ -1455,28 +1457,41 @@ tbody.collapse.show {
                   border-top-left-radius: 0;
                 }
                 `
-  
+
   serverUrl = "http://localhost:3000";
   var tasks = [];
+
+  function add_click_events() {
+    var containerDiv = document.querySelector(".app-layout");
+    containerDiv.addEventListener("click", function(event) {
+      console.log("clickeado en:");
+      console.log(event.target);
+      if (event.target.closest("a") != undefined) {
+        console.log(event.target.closest("a"));
+        currentHref = event.target.closest("a").href;
+        location.href = currentHref;
+      }
+    });
+  }
 
   function doGetRequest(url, callback) {
     GM.xmlHttpRequest({
       method: "GET",
       url: url,
-      headers: { "Content-Type": "application/json" },        
+      headers: { "Content-Type": "application/json" },
       synchronous: true,
       onload: function(response) {
         callback(response);
       }
     });
-  }  
+  }
 
   function doPostRequest(url, parameters, callback) {
     GM.xmlHttpRequest({
       method: "POST",
       url: url,
       data: parameters,
-      headers: { "Content-Type": "application/json" }, 
+      headers: { "Content-Type": "application/json" },
       synchronous: true,
       onload: function(response) {
         callback(response);
@@ -1488,13 +1503,13 @@ tbody.collapse.show {
     GM.xmlHttpRequest({
       method: "DELETE",
       url: url,
-      headers: { "Content-Type": "application/json" }, 
+      headers: { "Content-Type": "application/json" },
       synchronous: true,
       onload: function(response) {
         callback(response);
       }
     });
-  }  
+  }
 
   function loadBootstrap() {
     var link = document.createElement("link");
@@ -1511,8 +1526,24 @@ tbody.collapse.show {
       style.type = "text/css";
       style.appendChild(document.createTextNode(css));
       head.appendChild(style);
-    } 
-  } 
+    }
+  }
+
+  function sleep(ms) {
+    console.log("esperar por "+ms+" ms");
+    var i = 0;
+    var awaiting = setInterval(function() { //Se podrá hacer con Promise?
+      if (i == 1) {
+        console.log("limpie");
+        clearInterval(awaiting);
+      }
+      else {
+        i++;
+        console.log("Esperando");
+        console.log(i);
+      }
+    }, ms);
+  }
 
   function wait_for_element(className, action) {
     console.log("Awaiting for "+className);
@@ -1523,62 +1554,102 @@ tbody.collapse.show {
         console.log(className+" loaded");
         action();
       }
-    }, 100);    
+    }, 100);
+  }
+
+  function wait_for_stored_element(element) {
+    var awaiting = setInterval(function() { //Se podrá hacer con Promise?
+      if (sessionStorage.getItem(element)) {
+        clearInterval(awaiting);
+        console.log("stored element loaded");
+      }
+    }, 100);
+  }
+
+  function wait_for_element_expire(className, expiration, action) {
+    console.log("Awaiting for "+className);
+    var time = 0;
+    var awaiting = setInterval(function() { //Se podrá hacer con Promise?
+      var element = document.querySelector(className);
+      console.log(element);
+      if ((element != undefined) || (time == expiration)){
+        clearInterval(awaiting);
+        console.log(className+" loaded or it expired");
+        action();
+      }
+      else {
+        if (time != expiration) {
+          time = time + 100;
+        }
+      }
+    }, 100);
+  }
+
+  function wait_for_tag_element(tagName, action) {
+    console.log("Awaiting for "+tagName);
+    var awaiting = setInterval(function() { //Se podrá hacer con Promise?
+      var element = document.getElementsByTagName(tagName)[0];
+      if (element != undefined) {
+        clearInterval(awaiting);
+        console.log(tagName+" loaded");
+        action();
+      }
+    }, 100);
   }
 
   function create_login_form() {
     console.log("Creating login form");
     var form = document.createElement("form");
     form.id = "loginForm";
-    
+
     var handleDiv = document.createElement("div");
     handleDiv.className = "form-group";
-    
-    var handleLabel = document.createElement("label");    
+
+    var handleLabel = document.createElement("label");
     handleLabel.textContent = "Nombre de usuario";
     handleLabel.style = "color:black";
-    
+
     var handleInput = document.createElement("input");
     handleInput.id = "handleInput";
     handleInput.className = "form-control";
     handleInput.placeholder = "Ingrese nombre de usuario";
-   
+
     handleDiv.appendChild(handleLabel);
     handleDiv.appendChild(handleInput);
-    
+
     var passwordDiv = document.createElement("div");
     passwordDiv.className = "form-group";
-    
-    var passwordLabel = document.createElement("label");    
+
+    var passwordLabel = document.createElement("label");
     passwordLabel.textContent = "Contraseña";
     passwordLabel.style = "color:black";
-    
+
     var passwordInput = document.createElement("input");
     passwordInput.id = "passwordInput";
     passwordInput.className = "form-control";
     passwordInput.placeholder = "Contraseña";
-    
+
     passwordDiv.appendChild(passwordLabel);
     passwordDiv.appendChild(passwordInput);
-    
+
     var submitBtn = document.createElement("button");
     submitBtn.type = "submit";
     submitBtn.className = "btn btn-default";
     submitBtn.textContent = "Ingresar";
-    
+
     form.appendChild(handleDiv);
     form.appendChild(passwordDiv);
     form.appendChild(submitBtn);
-   
+
     submitBtn.addEventListener("click", function() {
       var handleValue = document.getElementById("handleInput").value;
       var passwordValue = document.getElementById("passwordInput").value;
-      
+
       var userData = {
         "handle": handleValue,
         "password": passwordValue
       }
-      
+
       var params = JSON.stringify({"user": userData});
       doPostRequest(serverUrl + "/login", params, function(response) {
         jsonResponse = JSON.parse(response.response);
@@ -1610,8 +1681,8 @@ tbody.collapse.show {
         }
       });
 
-    });    
-     
+    });
+
     return form;
   }
 
@@ -1619,84 +1690,84 @@ tbody.collapse.show {
     console.log("Creating register form");
     var form = document.createElement("form");
     form.id = "registerForm";
-    
+
     var handleDiv = document.createElement("div");
     handleDiv.className = "form-group";
-    
-    var handleLabel = document.createElement("label");    
+
+    var handleLabel = document.createElement("label");
     handleLabel.textContent = "Nombre de usuario";
     handleLabel.style = "color:black";
-    
+
     var handleInput = document.createElement("input");
     handleInput.id = "handleInput";
     handleInput.className = "form-control";
     handleInput.placeholder = "Ingrese nombre de usuario";
-   
+
     handleDiv.appendChild(handleLabel);
     handleDiv.appendChild(handleInput);
-    
+
     var emailDiv = document.createElement("div");
-    emailDiv.className = "form-group"; 
-    
-    var emailLabel = document.createElement("label");    
+    emailDiv.className = "form-group";
+
+    var emailLabel = document.createElement("label");
     emailLabel.textContent = "E-Mail";
     emailLabel.style = "color:black";
-    
+
     var emailInput = document.createElement("input");
     emailInput.id = "emailInput"
     emailInput.className = "form-control";
-    emailInput.placeholder = "Ingrese su correo electrónico";    
+    emailInput.placeholder = "Ingrese su correo electrónico";
 
     emailDiv.appendChild(emailLabel);
-    emailDiv.appendChild(emailInput);    
-    
+    emailDiv.appendChild(emailInput);
+
     var passwordDiv = document.createElement("div");
     passwordDiv.className = "form-group";
-    
-    var passwordLabel = document.createElement("label");    
+
+    var passwordLabel = document.createElement("label");
     passwordLabel.textContent = "Contraseña";
     passwordLabel.style = "color:black";
-    
+
     var passwordInput = document.createElement("input");
     passwordInput.id = "passwordInput";
     passwordInput.className = "form-control";
     passwordInput.type = "password"
     passwordInput.placeholder = "Contraseña";
-    
+
     passwordDiv.appendChild(passwordLabel);
     passwordDiv.appendChild(passwordInput);
-    
+
     var confirmPassDiv = document.createElement("div");
     confirmPassDiv.className = "form-group";
-    
-    var confirmPassLabel = document.createElement("label");    
+
+    var confirmPassLabel = document.createElement("label");
     confirmPassLabel.textContent = "Confirmar contraseña";
     confirmPassLabel.style = "color:black";
-    
+
     var confirmPassInput = document.createElement("input");
     confirmPassInput.className = "form-control";
     confirmPassInput.type = "password"
     confirmPassInput.placeholder = "Vuelva a ingresar la contraseña";
-    
+
     confirmPassDiv.appendChild(confirmPassLabel);
-    confirmPassDiv.appendChild(confirmPassInput);    
-    
+    confirmPassDiv.appendChild(confirmPassInput);
+
     var submitBtn = document.createElement("button");
     submitBtn.type = "submit";
     submitBtn.className = "btn btn-default";
     submitBtn.textContent = "Registro";
-    
+
     submitBtn.addEventListener("click", function() {
       var handleValue = document.getElementById("handleInput").value;
       var emailValue = document.getElementById("emailInput").value;
       var passwordValue = document.getElementById("passwordInput").value;
-      
+
       var userData = {
         "handle": handleValue,
         "email": emailValue,
         "password": passwordValue
       };
-      
+
       var params = JSON.stringify({"user": userData});
       doPostRequest(serverUrl + "/register", params, function(response) {
         jsonResponse = JSON.parse(response.response)
@@ -1725,13 +1796,13 @@ tbody.collapse.show {
         }
       });
     });
-    
+
     form.appendChild(handleDiv);
     form.appendChild(emailDiv);
     form.appendChild(passwordDiv);
     form.appendChild(confirmPassDiv);
     form.appendChild(submitBtn);
-     
+
     return form;
   }
 
@@ -1739,17 +1810,17 @@ tbody.collapse.show {
     console.log("Creating nav tabs");
     var navigation = document.createElement("nav");
     navigation.style = "display: flex"; //No sé por qué no funciona desde la clase. Un override en algún lugar, maldición
-    
+
     var registerTabLink = document.createElement("a");
     registerTabLink.href = "#";
     registerTabLink.className = "nav-link col-6";
     registerTabLink.textContent = "Registrarse";
-    
+
     var loginTabLink = document.createElement("a");
     loginTabLink.href = "#";
     loginTabLink.className = "active nav-link col-6";
     loginTabLink.textContent = "Ingresar";
- 
+
     loginTabLink.addEventListener("click", function() {
       //Poner el form de login si es que no está activo (y sacar el otro?)
       var loginForm = document.getElementById("loginForm");
@@ -1758,10 +1829,10 @@ tbody.collapse.show {
         var modal = document.querySelector(".modal-content");
         modal.removeChild(registerForm);
         registerTabLink.className = "nav-link col-6";
-        loginTabLink.className = "active nav-link col-6";        
+        loginTabLink.className = "active nav-link col-6";
         modal.appendChild(create_login_form());
-      }      
-    });    
+      }
+    });
 
     registerTabLink.addEventListener("click", function() {
       //Poner el form de registro si es que no está activo (y sacar el otro?)
@@ -1774,48 +1845,48 @@ tbody.collapse.show {
         loginTabLink.className = "nav-link col-6";
         modal.appendChild(create_register_form());
       }
-    });    
-    
-    navigation.className = "nav nav-tabs"; 
- 
-    navigation.appendChild(loginTabLink);    
+    });
+
+    navigation.className = "nav nav-tabs";
+
+    navigation.appendChild(loginTabLink);
     navigation.appendChild(registerTabLink);
-    
+
     return navigation;
   }
 
   function add_gzoo_to_navbar(callback) {
     console.log("About to stick GZoo's button in the navbar");
-        
+
     var modalWrapper = document.createElement('div');
     modalWrapper.id = "gZooModalWrapper";
     modalWrapper.className = "modal";
     modalWrapper.className += " col-4 offset-4";
-    modalWrapper.style.display = "none"; 
-    
+    modalWrapper.style.display = "none";
+
     var gZooModal = document.createElement('div');
     gZooModal.id = "gZooModal";
     gZooModal.className = "modal-content";
-    
+
     var closeModal = document.createElement('span');
     closeModal.className = "close";
     closeModal.innerHTML = "&times;";
-    gZooModal.appendChild(closeModal);    
-    
+    gZooModal.appendChild(closeModal);
+
     var gZooButton = document.createElement("button");
     gZooButton.id = "gZooAccount";
     gZooButton.className = "site-nav__link";
-    
+
     var gZooSpan = document.createElement("span");
     gZooSpan.className = "site-nav__inbox-link";
-    
+
     var textSpan = document.createElement("span");
     textSpan.innerHTML = "GZoo";
     gZooButton.appendChild(gZooSpan);
     gZooSpan.appendChild(textSpan);
-    
+
     callback(gZooModal);
-    
+
     console.log("Stuff created");
     gZooButton.onclick = function() {
       if (modalWrapper.style.display === "none") {
@@ -1825,34 +1896,34 @@ tbody.collapse.show {
         modalWrapper.style.display = "none";
       }
     }
-    
+
     closeModal.onclick = function() {
       modalWrapper.style.display = "none";
     }
-    
+
     modalWrapper.appendChild(gZooModal);
 
     //document.getElementsByTagName("body")[0].prepend(modalWrapper);
-    
+
     document.querySelector(".app-layout").prepend(modalWrapper);
-    
+
     console.log("Events attached");
-    
+
     if (!(document.querySelector(".account-bar") == undefined)) {
       document.querySelector(".account-bar").prepend(gZooButton);
-      console.log("Attached GZoo thingy into the account bar");      
+      console.log("Attached GZoo thingy into the account bar");
     }
     else {
       if (!(document.querySelector(".login-bar") == undefined)) {
         document.querySelector(".login-bar").prepend(gZooButton);
-        console.log("Attached GZoo thingy into the login bar");      
+        console.log("Attached GZoo thingy into the login bar");
       }
     }
-    
+
     wait_for_element("account-bar", function() {
       document.querySelector(".account-bar").prepend(gZooButton);
       console.log("Attached GZoo thingy into the thing");
-    });   
+    });
   }
 
   function project_landing_page() {
@@ -1871,20 +1942,32 @@ tbody.collapse.show {
     return window.location.host
   }
 
-  function user_is_logged_in() {
+  function user_gz_logged_in() {
     var user_token = sessionStorage.getItem("user_token");
     if (user_token == undefined) {
-      return false;  
+      return false;
     }
-    return true;     
+    return true;
   }
 
-  function user_site_logged_in() {
-    return (document.getElementsByClassName('modal-form-trigger site-nav__modal secret-button').length != 0);
+  function is_user_site_logged_in() {
+    wait_for_element_expire("button.modal-form-trigger.site-nav__modal.secret-button", 5000, function() {
+      if (document.querySelector("button.modal-form-trigger.site-nav__modal.secret-button") != undefined) {
+        sessionStorage.removeItem("user_site_logged_in");
+        sessionStorage.setItem("user_site_logged_in", true)
+      }
+      else {
+        sessionStorage.removeItem("user_site_logged_in");
+        sessionStorage.setItem("user_site_logged_in", false)
+      }
+    });
   }
+
 
   function user_site_username() {
-    if (user_site_logged_in()) {
+    is_user_site_logged_in();
+    user_site_logged_in = sessionStorage.getItem("user_site_logged_in");
+    if (user_site_logged_in == "true") {
       return (document.getElementsByClassName('modal-form-trigger site-nav__modal secret-button')[0].children[0].children[0].textContent);
     }
     else {
@@ -1892,45 +1975,52 @@ tbody.collapse.show {
     }
   }
 
+
   function current_project_name() {
-    return document.getElementsByClassName("sc-cSHVUG MmxFZ")[0].children[0].textContent;
+    wait_for_tag_element("h1", function() {
+      var containerHeader = document.getElementsByTagName("h1")[0];
+      console.log("HEADER");
+      console.log(containerHeader);
+      sessionStorage.removeItem("current_project_name");
+      sessionStorage.setItem("current_project_name", containerHeader.children[0].children[0].textContent);
+    });
   }
 
   function user_not_joined() {
-    wait_for_element("sc-cSHVUG", function() {
-      doGetRequest(serverUrl+"/projects", function(response) {
-        jsonResponse = JSON.parse(response.response);
-        sessionStorage.setItem("projects", JSON.stringify(jsonResponse));
-        var not_found = true;
-        console.log("Projects:");
-        console.log(jsonResponse);
-        if (jsonResponse.length > 0) {
-          var i = 0;
+    doGetRequest(serverUrl+"/projects", function(response) {
+      jsonResponse = JSON.parse(response.response);
+      sessionStorage.setItem("projects", JSON.stringify(jsonResponse));
+      var not_found = true;
+      console.log("Projects:");
+      console.log(jsonResponse);
+      if (jsonResponse.length > 0) {
+        var i = 0;
 
-          while ((not_found) && (i < jsonResponse.length)) {
-            if (jsonResponse[i]["name"] == current_project_name()) {
+        while ((not_found) && (i < jsonResponse.length)) {
+          current_project_name();
+          var current_project = sessionStorage.getItem("current_project_name");
+          if (jsonResponse[i]["name"] == current_project) {
+            not_found = false;
+            var project = jsonResponse[i];
+          }
+          i++;
+        }
+        if (!not_found) {
+          var collaborators = project["collaborators"];
+          var i = 0;
+          var not_found = true;
+          var user_id = sessionStorage.getItem("user_id");
+          while ((not_found) && (i < collaborators.length)) {
+            if (collaborators[i]["id"] == user_id) {
               not_found = false;
-              var project = jsonResponse[i];
             }
             i++;
           }
-          if (!not_found) {
-            var collaborators = project["collaborators"];
-            var i = 0;
-            var not_found = true;
-            var user_id = sessionStorage.getItem("user_id");
-            while ((not_found) && (i < collaborators.length)) {
-              if (collaborators[i]["id"] == user_id) {
-                not_found = false;
-              }
-              i++;
-            }
-          }
         }
+      }
 
-        sessionStorage.removeItem("user_not_joined");
-        sessionStorage.setItem("user_not_joined", not_found);
-      });
+      sessionStorage.removeItem("user_not_joined");
+      sessionStorage.setItem("user_not_joined", not_found);
     });
   }
 
@@ -1951,6 +2041,9 @@ tbody.collapse.show {
   }
 
   function executeScript() {
+    if (document.readyState != "complete") {
+      location.reload();
+    }
     loadBootstrap();
     console.log("Welcome to Zooniverse Gamified!");
 
@@ -1965,7 +2058,7 @@ tbody.collapse.show {
       addStyle(modalStyle);
       addStyle(formBootstrap);
       addStyle(btsNavs);
-      if (user_is_logged_in()) {
+      if (user_gz_logged_in()) {
         console.log("User logged in. Add GZoo navbar thing");
         add_gzoo_to_navbar(function(gZooModal) {
           //Insertar un row con un <p> que diga qué usuario está logueado
@@ -1983,7 +2076,9 @@ tbody.collapse.show {
 
           gZooModal.appendChild(loggedRow);
           //Lo siguiente, si está logueado en Zooniverse y si las cuentas no están linkeadas
-          if (user_site_logged_in()) {
+          is_user_site_logged_in();
+          user_site_logged_in = sessionStorage.getItem("user_site_logged_in");
+          if (user_site_logged_in == "true") {
             console.log("User logged in in Zooniverse");
             accounts_not_linked();
             var linked = sessionStorage.getItem("linked");
@@ -1997,7 +2092,7 @@ tbody.collapse.show {
               connectP.textContent = "Las cuentas no están vinculadas";
               var connectButton = document.createElement('button');
               connectButton.textContent = "Vincular cuentas";
-              
+
               connectButton.addEventListener("click", function() {
                 user_id = sessionStorage.getItem("user_id");
                 params = JSON.stringify({"site": site_url(), "username": user_site_username()});
@@ -2013,12 +2108,12 @@ tbody.collapse.show {
                   }
                 });
               });
-              
+
               connectCol.appendChild(connectP);
               connectCol.appendChild(connectButton);
               connectRow.appendChild(connectCol);
-              
-              gZooModal.appendChild(connectRow); 
+
+              gZooModal.appendChild(connectRow);
             }
             else {
               console.log("Accounts are linked");
@@ -2028,9 +2123,9 @@ tbody.collapse.show {
               profileDiv.className = "container";
               profileDiv.style.borderStyle = "dotted";
               profileDiv.style.minHeight = "100px";
-              coso.id = "1111111223";
+              //coso.id = "1111111223";
               gZooModal.appendChild(profileDiv);
-              
+
               //<div class="container" style="border-style: dotted;min-height: 100px;"></div>
             }
           }
@@ -2065,10 +2160,10 @@ tbody.collapse.show {
 
           logoutCol.appendChild(logoutButton);
           logoutRow.appendChild(logoutCol);
-          
+
           gZooModal.appendChild(document.createElement("br"));
           gZooModal.appendChild(logoutRow);
-          
+
           //El botón de GZoo en el navbar tendría que mostrar otras cosas
           //El perfil?
         });
@@ -2076,11 +2171,11 @@ tbody.collapse.show {
       else {
         add_gzoo_to_navbar(function(gZooModal) {
           gZooModal.appendChild(create_nav_tabs());
-          gZooModal.appendChild(create_login_form());   
+          gZooModal.appendChild(create_login_form());
         });
       }
     }
-    
+
     //En la página de inicio
 
     if (index_page()) {
@@ -2090,10 +2185,10 @@ tbody.collapse.show {
       unDiv.className = "col-3 offset-8";
       unDiv.style = "float: right";
       //document.querySelector(".home-page-for-user__content").prepend(unDiv);
-      if (user_is_logged_in() && user_site_logged_in()) {
+      if (user_gz_logged_in() && user_site_logged_in()) {
         //Módulo con datos del sitio (Zooniverse)
-        
-        
+
+
         //Lo siguiente pone un div más o menos coherente, mirar luego
         var unDiv = document.createElement("div");
         unDiv.id = "userSiteCollaboration";
@@ -2107,14 +2202,14 @@ tbody.collapse.show {
       }
 
     }
-    
+
     //En la pantalla principal del proyecto
 
     if (project_landing_page()) {
       console.log("In a project's landing page");
       user_not_joined();
       var not_joined = sessionStorage.getItem("user_not_joined");
-      if ((user_is_logged_in()) && (not_joined == "true")) { 
+      if ((user_gz_logged_in()) && (not_joined == "true")) {
         console.log("User logged in and not joined");
         wait_for_element("project-home-page__call-to-action", function() {
           var buttonsDiv = document.querySelector(".project-home-page__call-to-action");
@@ -2122,7 +2217,9 @@ tbody.collapse.show {
           joinButton.textContent = "Unirse al proyecto en GZoo";
 
           joinButton.addEventListener("click", function() {
-            params = JSON.stringify({"project": current_project_name(), "site": "zooniverse.org"});
+            current_project_name();
+            var current_project = sessionStorage.getItem("current_project_name");
+            params = JSON.stringify({"project": current_project, "site": "zooniverse.org"});
             var user_id = sessionStorage.getItem("user_id");
             doPostRequest(serverUrl+"/users/"+user_id+"/join_project", params, function(response) {
               // >>>>>>>> CONTINUE HERE
@@ -2132,10 +2229,10 @@ tbody.collapse.show {
 
           buttonsDiv.appendChild(joinButton);
           console.log("Attached Join button");
-        });     
+        });
       }
       else {
-        if (!(user_is_logged_in())) {
+        if (!(user_gz_logged_in())) {
           console.log("Please log in.")
           wait_for_element("project-home-page__call-to-action", function() {
             var buttonsDiv = document.querySelector(".project-home-page__call-to-action");
@@ -2144,7 +2241,7 @@ tbody.collapse.show {
             joinButton.textContent = "Ingrese sesión en GZoo";
             buttonsDiv.appendChild(joinButton);
             console.log("Attached Join button");
-          });            
+          });
         }
         else {
           console.log("Joined.")
@@ -2155,7 +2252,7 @@ tbody.collapse.show {
             joinButton.textContent = "Unido!";
             buttonsDiv.appendChild(joinButton);
             console.log("Attached Join button");
-          }); 
+          });
 
 
 
@@ -2177,7 +2274,7 @@ tbody.collapse.show {
 
       function userIsCollaborator(project, loggedUser) {
         if (project.collaborators != undefined) {
-          return ((project.collaborators.find(o => o.zooniverseHandle === loggedUser)) != undefined);
+          return ((project.collaborators.find(collaborator => collaborator.handle === loggedUser.handle)) != undefined);
         }
         return false;
       }
@@ -2190,7 +2287,7 @@ tbody.collapse.show {
 
       function addEventToButton(project, user) {
         console.log("UGH dale loco");
-        document.getElementsByClassName('continue major-button')[0].addEventListener("click", addEvent, false); 
+        document.getElementsByClassName('continue major-button')[0].addEventListener("click", addEvent, false);
         function addEvent() {
           var buttonText = document.getElementsByClassName('continue major-button')[0].children[0].innerHTML;
           if (buttonText == 'Done') {
@@ -2200,12 +2297,15 @@ tbody.collapse.show {
               params = JSON.stringify({"user_id": user.id, "project_id": project.id});
               console.log(project.id);
               console.log(params);
-              doPostRequest(serverUrl + "/projects/"+project.id+"/collaborations", params);
-            } 
+              doPostRequest(serverUrl + "/projects/"+project.id+"/collaborations", params, function(response) {
+
+            });
+            }
             params = JSON.stringify({"tasks": tasks});
-            var userCollaboration = doGetRequest("/users/"+user.id+"/collaboration/"+project.id);
-            doPostRequest(serverUrl + "/projects/"+project.id+"/collaborations/"+userCollaboration.id+"/increment", params);    
-            tasks = [];     
+            var userCollaboration = doGetRequest(serverUrl+"/users/"+user.id+"/collaboration/"+project.id);
+            doPostRequest(serverUrl + "/projects/"+project.id+"/collaborations/"+userCollaboration.id+"/increment", params, function(response) {
+            });
+            tasks = [];
           } else if (buttonText == 'Next') {
             //Agregar el tipo de tarea que se acaba de resolver. Si el Next indica que se pasa a la siguiente tarea, no hacer nada.
             if (document.getElementsByClassName('classification-summary')[0] == undefined) {
@@ -2214,12 +2314,12 @@ tbody.collapse.show {
             console.log("tareas so far:");
             console.log(tasks);
           }
-        }     
+        }
       }
 
 
-      function gameOn() {      
-        function addScoreboard(project) { //Como parámetro, el elemento html donde se quiera insertar el div del scoreboard
+      function gameOn() {
+        function addScoreboard(scoreboardDiv, project) { //Como parámetro, el elemento html donde se quiera insertar el div del scoreboard
           //Div + tabla de puntos
 
           var row = scoreboardTable.insertRow();
@@ -2229,12 +2329,6 @@ tbody.collapse.show {
           nickCell.innerHTML = "Nickname";
           scoreCell.innerHTML = "Score";
 
-          var row2 = scoreboardTable.insertRow();
-          var nickCell2 = row2.insertCell(0);
-          var scoreCell2 = row2.insertCell(-1);
-
-          //En estos tres últimos bloques del código tengo que primero pedir los colaboradores del proyecto a la API, y luego crear la tabla dentro de algún iterador
-
           var scoreboardHeaderDiv = document.createElement('div');
           scoreboardHeaderDiv.style.textAlign = 'center';
           scoreboardHeaderDiv.style.padding = '5px 5px 5px 5px';
@@ -2243,13 +2337,32 @@ tbody.collapse.show {
           scoreboardHeaderDiv.appendChild(scoreboardHeader);
           scoreboardDiv.appendChild(scoreboardHeaderDiv);
           scoreboardDiv.appendChild(scoreboardTable);
-          console.log("Appended table to div"); 
+          console.log("Appended table to div");
           var taskArea = document.getElementsByClassName('task-area')[0];
           taskArea.parentNode.insertBefore(scoreboardDiv, document.getElementsByClassName('task-area')[0].nextSibling);
+        }
 
-        }      
+        function populateBoard(board, project) {
+          //board es una tabla HTML
+          var collaborators_count = project.collaborators.length;
+          for (var i = 0; i < collaborators_count; i++) {
+            var collaborator = project.collaborators[i];
+            var row = board.insertRow();
+            var handle = row.insertCell();
+            handle.innerHTML = collaborator.handle;
+            var score = row.insertCell();
+            score.style.textAlign = 'center';
+            if (collaborator.points == null) {
+              score.innerHTML = '0';
+            }
+            else {
+              score.innerHTML = collaborator.points;
+            }
+          }
 
-        function addContribution(project, loggedUser) { //Como parámetro, el elemento html donde se quiera insertar el div de contribución
+        }
+
+        function addContributionDiv(project, loggedUser) { //Como parámetro, el elemento html donde se quiera insertar el div de contribución
           var contributionDiv = document.createElement('div');
           contributionDiv.id = 'contributionDiv';
           var contributionHeaderDiv = document.createElement('div');
@@ -2257,7 +2370,7 @@ tbody.collapse.show {
           contributionHeaderDiv.style.textAlign = 'center';
           contributionHeaderDiv.style.padding = '5px 5px 5px 5px';
           var strongTitleTextHolder = document.createElement('strong');
-          strongTitleTextHolder.appendChild(document.createTextNode('Mi contribución en ' + projectName));
+          strongTitleTextHolder.appendChild(document.createTextNode('Mi contribución en ' + project.name));
           contributionHeaderDiv.appendChild(strongTitleTextHolder);
           contributionDiv.appendChild(contributionHeaderDiv);
 
@@ -2265,8 +2378,26 @@ tbody.collapse.show {
           var sinceSpan = document.createElement('span');
           sinceSpan.style.display = 'inline-block';
 
-          var userCollaboration = doGetRequest("/users/"+user.id+"/collaboration/"+project.id);        
+          doGetRequest(serverUrl + "/users/" + loggedUser.id + "/collaboration/" + project.id, function(response) {
+            console.log("La respuesta de user/collaboration:");
+            console.log(response);
+            jsonResponse = JSON.parse(response.response);
+            console.log("Colaboración del usuario en el proyecto:");
+            console.log(jsonResponse);
+            if (response.status == 200) {
+              sessionStorage.removeItem("user_collaboration");
+              sessionStorage.setItem("user_collaboration", JSON.stringify(jsonResponse));
+            }
+            else {
+              //Alguna especie de error
+            }
+          });
 
+          wait_for_stored_element("user_collaboration");
+
+          console.log("Por parsear user_collaboration:");
+          console.log(sessionStorage.getItem("user_collaboration"));
+          var userCollaboration = JSON.parse(sessionStorage.getItem("user_collaboration"));
           var firstContributionDate = userCollaboration.created_at;
           // '01/01/1900'; //placeholder. created_at es la primera; updated_at es la última
 
@@ -2325,8 +2456,13 @@ tbody.collapse.show {
 
           contributionDataDiv.appendChild(badgesDiv);
 
+          var taskArea = document.getElementsByClassName('task-area')[0];
           taskArea.appendChild(contributionDiv); //El div con lo de mi colaboración
           taskArea.appendChild(contributionDataDiv);
+        }
+
+        function askToJoin() {
+
         }
 
         var tableStyle = `element {
@@ -2354,53 +2490,85 @@ tbody.collapse.show {
         style.appendChild(document.createTextNode(tableStyle));
         document.head.appendChild(style);
 
+        var user = JSON.parse(sessionStorage.getItem("user_data"));
+
         console.log("Found classify element");
 
-        projectName = document.getElementsByClassName('tabbed-content-tab')[0].text.replace(/"/g,"");          
+        current_project_name();
+        projectName = sessionStorage.getItem("current_project_name");
 
         //POSTeo de una. Si ya existe con ese nombre, me lo devuelve
         params = JSON.stringify({"name": projectName});
-        var project = doPostRequest(serverUrl + "/projects", params);
+        doPostRequest(serverUrl + "/projects", params, function(response) {
+        jsonResponse = JSON.parse(response.response);
+          if ((response.status == 200) || (response.status == 201)) {
+            console.log("Project POSTed");
+            sessionStorage.removeItem("project");;
+            sessionStorage.setItem("project", JSON.stringify(jsonResponse))
+          }
+        });
+
+        wait_for_stored_element("project");
+        var project = JSON.parse(sessionStorage.getItem("project"));
+        console.log("el proyecto es:");
+        console.log(project);
+        console.log("STORED cargado");
 
         //Tengo que traerme los datos del proyecto actual (o sea, levantar el id a partir de lo anterior). A partir de esto, agarrar el colaborador actual de la lista de colaboradores del proyecto, y armar el coso de info de abajo
-
-        if (!(user_site_logged_in())) {
+        is_user_site_logged_in();
+        user_site_logged_in = sessionStorage.getItem("user_site_logged_in");
+        if ((!(user_site_logged_in)) || (!(user_gz_logged_in))) {
+          console.log("No está logueado o en sitio o en app");
           //No está logueado, debería para que ande. Poner un aviso en algún lado. Un alert ni da. Estaría bueno uno de esos cartelitos que hoverean. Para esto y para otras cosas
         } else {
-          var loggedUser = document.getElementsByClassName('site-nav__link')[9].children[0].innerHTML.replace(/"/g,"");
+          var loggedUser = JSON.parse(sessionStorage.getItem("user_data"));
+
+          console.log("el usuario logueado es:");
+          console.log(loggedUser);
 
           if (userIsCollaborator(project, loggedUser)) {
-            addContribution(project, loggedUser);
+            console.log("Por agregar el coso de contribution");
+            addContributionDiv(project, loggedUser);
           }
           else {
-            askToJoin();    
+            console.log("User no es colaborador, pedir que se una o algo");
+            askToJoin();
           }
         }
 
         var scoreboardDiv = document.createElement('div');
         scoreboardDiv.style.marginLeft = '1em';
-        scoreboardDiv.style.width = '20%';
+        scoreboardDiv.style.width = '25%';
         var scoreboardTable = document.createElement("table");
         scoreboardTable.className = 'table';
         scoreboardTable.id = "tablaPuntaje";
-        console.log("Table created");      
+        scoreboardTable.style.margin = "0px auto";
+        scoreboardDiv.appendChild(scoreboardTable);
+        console.log("Table created");
+
+        console.log("colaboradores del proyecto:");
+        console.log(project.collaborators);
 
         if (project.collaborators != undefined) {
-          addScoreboard(project);
+          addScoreboard(scoreboardDiv, project);
+          populateBoard(scoreboardTable, project);
         } else {
+          console.log("Sin colaboradores");
           scoreboardTable.innerHTML = "<center> Aún no hay colaboradores en este proyecto. Sé el primero </center>";
+          var taskArea = document.getElementsByClassName('task-area')[0];
+          taskArea.parentNode.insertBefore(scoreboardDiv, document.getElementsByClassName('task-area')[0].nextSibling);
         }
       //document.getElementsByClassName('task-container')[0].addEventListener("change", );
       addEventToButton(project, user);
 
         var notAdded = true;
-        var awaiting2 = setInterval(function() { 
+        var awaiting2 = setInterval(function() {
           var sumario = document.getElementsByClassName('classification-summary')[0];
           var markQuest = document.getElementsByClassName('markdown question')[0];
             if ((sumario != undefined) && notAdded) {
               addEventToButton(project, user);
               notAdded = false;
-              var awaiting3 = setInterval(function() { 
+              var awaiting3 = setInterval(function() {
                 var markQuest = document.getElementsByClassName('markdown question')[0];
                 if (markQuest != undefined) {
                   addEventToButton(project, user);
@@ -2414,5 +2582,4 @@ tbody.collapse.show {
 
       }
     }
-    
   }
