@@ -1464,8 +1464,8 @@ tbody.collapse.show {
   function add_click_events() {
     var containerDiv = document.querySelector(".app-layout");
     containerDiv.addEventListener("click", function(event) {
-      console.log("clickeado en:");
-      console.log(event.target);
+      //console.log("clickeado en:");
+      //console.log(event.target);
       if (event.target.closest("a") != undefined) {
         console.log(event.target.closest("a"));
         currentHref = event.target.closest("a").href;
@@ -1665,13 +1665,12 @@ tbody.collapse.show {
           sessionStorage.setItem("user_id", user_id);
           sessionStorage.setItem("user_token", user_token);
           sessionStorage.setItem("user_handle", user_handle);
-          sessionStorage.setItem("user_data", JSON.stringify(jsonResponse["user"]))
-          location.reload();
+          sessionStorage.setItem("user_data", JSON.stringify(jsonResponse["user"]));
           console.log("Los valores guardados son:");
           console.log(sessionStorage.getItem("user_id"));
           console.log(sessionStorage.getItem("user_token"));
           console.log(sessionStorage.getItem("user_handle"));
-          //Lo mismo que en el registro
+          location.reload();
         }
         else {
           //Mirar los errores y cambiar los campos
@@ -2280,9 +2279,70 @@ tbody.collapse.show {
       }
 
       function taskType() {
+        if (document.getElementsByClassName("survey-task").length > 0) return "survey";
         if (document.getElementsByClassName('answer minor-button answer-button').length > 0) return "simpleQuestion";
         if (document.getElementsByClassName('drawing-tool-button-input').length > 0) return "drawing";
         return "notSupported";
+      }
+
+      function addScoreboard(scoreboardDiv, project) { //Como parámetro, el elemento html donde se quiera insertar el div del scoreboard
+        //Div + tabla de puntos
+
+        var row = scoreboardTable.insertRow();
+        row.style.backgroundColor = "#43bbfd";
+        var nickCell = row.insertCell(0);
+        var scoreCell = row.insertCell(-1);
+        nickCell.innerHTML = "Nickname";
+        scoreCell.innerHTML = "Score";
+
+        var scoreboardHeaderDiv = document.createElement('div');
+        scoreboardHeaderDiv.style.textAlign = 'center';
+        scoreboardHeaderDiv.style.padding = '5px 5px 5px 5px';
+        var scoreboardHeader = document.createElement('strong');
+        scoreboardHeader.innerHTML = "Tabla de puntajes";
+        scoreboardHeaderDiv.appendChild(scoreboardHeader);
+        scoreboardDiv.appendChild(scoreboardHeaderDiv);
+        scoreboardDiv.appendChild(scoreboardTable);
+        console.log("Appended table to div");
+        var taskArea = document.getElementsByClassName('task-area')[0];
+        taskArea.parentNode.insertBefore(scoreboardDiv, document.getElementsByClassName('task-area')[0].nextSibling);
+      }
+
+      function populateBoard(board, project) {
+        //board es una tabla HTML
+        var collaborators_count = project.collaborators.length;
+        for (var i = 0; i < collaborators_count; i++) {
+          var collaborator = project.collaborators[i];
+          var row = board.insertRow();
+          var handle = row.insertCell();
+          handle.innerHTML = collaborator.handle;
+          var score = row.insertCell();
+          score.style.textAlign = 'center';
+          if (collaborator.points == null) {
+            score.innerHTML = '0';
+          }
+          else {
+            score.innerHTML = collaborator.points;
+          }
+        }
+
+      }      
+
+      function update_scoreboard_and_contribution(project) {
+        //Lo mejor será hacer un request directamente a projects/:project_id y generar la tabla de nuevo
+        document.getElementById("scoreboardDiv").remove();
+        var scoreboardDiv = document.createElement('div');
+        scoreboardDiv.id = "scoreboardDiv";
+        scoreboardDiv.style.marginLeft = '1em';
+        scoreboardDiv.style.width = '25%';
+        var scoreboardTable = document.createElement("table");
+        scoreboardTable.className = 'table';
+        scoreboardTable.id = "tablaPuntaje";
+        scoreboardTable.style.margin = "0px auto";
+        scoreboardDiv.appendChild(scoreboardTable);
+        addScoreboard(scoreboardDiv, project);
+        populateBoard(scoreboardTable, project);
+
       }
 
       function addEventToButton(project, user) {
@@ -2290,26 +2350,51 @@ tbody.collapse.show {
         document.getElementsByClassName('continue major-button')[0].addEventListener("click", addEvent, false);
         function addEvent() {
           var buttonText = document.getElementsByClassName('continue major-button')[0].children[0].innerHTML;
+          sessionStorage.setItem("jsTasks", "[]");
           if (buttonText == 'Done') {
             //POSTear los puntos. Generar la colaboración si es necesario, y luego sumar los puntos.
-            console.log(project);
+            //console.log(project);
+
+              //Quiere decir que hay una pregunta o algún tipo de tarea, que finalizará con un Done.
+              //Posiblemente indique que sea la última tarea
+            console.log("Clasificación completada.");
+            tasks = JSON.parse(sessionStorage.getItem("jsTasks"));
+            tasks.push(taskType());
+
             if (!(userIsCollaborator(project,user))) {
               params = JSON.stringify({"user_id": user.id, "project_id": project.id});
               console.log(project.id);
               console.log(params);
               doPostRequest(serverUrl + "/projects/"+project.id+"/collaborations", params, function(response) {
 
-            });
+              });
             }
-            params = JSON.stringify({"tasks": tasks});
-            var userCollaboration = doGetRequest(serverUrl+"/users/"+user.id+"/collaboration/"+project.id);
+
+            params = JSON.stringify({"tasks": jsTasks});
+            var userCollaboration = JSON.parse(sessionStorage.getItem("user_collaboration"));
+            console.log("Posteando la colaboración");
             doPostRequest(serverUrl + "/projects/"+project.id+"/collaborations/"+userCollaboration.id+"/increment", params, function(response) {
+              //Esto me devuelve la colaboración actualizada
+              jsonResponse = JSON.parse(response.response);
+              if (response.status == 200) {
+                sessionStorage.removeItem("user_collaboration");
+                sessionStorage.setItem("user_collaboration", JSON.stringify(jsonResponse));
+                update_scoreboard_and_contribution(project);
+              }
+              //Además, acá hay que actualizar tanto la tabla de puntos como el coso de colaboración de abajo
+            }
             });
-            tasks = [];
+            console.log("Reseteando las tareas");
+            //Reseteo las tareas
+            sessionStorage.setItem("jsTasks", "[]");
           } else if (buttonText == 'Next') {
             //Agregar el tipo de tarea que se acaba de resolver. Si el Next indica que se pasa a la siguiente tarea, no hacer nada.
             if (document.getElementsByClassName('classification-summary')[0] == undefined) {
+              console.log("Tarea completada. Pasando a la siguiente");
+              tasks = JSON.parse(sessionStorage.getItem("jsTasks"));
               tasks.push(taskType());
+              jsTasks = JSON.stringify(tasks);
+              sessionStorage.setItem("jsTasks", jsTasks);
             }
             console.log("tareas so far:");
             console.log(tasks);
@@ -2317,51 +2402,7 @@ tbody.collapse.show {
         }
       }
 
-
       function gameOn() {
-        function addScoreboard(scoreboardDiv, project) { //Como parámetro, el elemento html donde se quiera insertar el div del scoreboard
-          //Div + tabla de puntos
-
-          var row = scoreboardTable.insertRow();
-          row.style.backgroundColor = "#43bbfd";
-          var nickCell = row.insertCell(0);
-          var scoreCell = row.insertCell(-1);
-          nickCell.innerHTML = "Nickname";
-          scoreCell.innerHTML = "Score";
-
-          var scoreboardHeaderDiv = document.createElement('div');
-          scoreboardHeaderDiv.style.textAlign = 'center';
-          scoreboardHeaderDiv.style.padding = '5px 5px 5px 5px';
-          var scoreboardHeader = document.createElement('strong');
-          scoreboardHeader.innerHTML = "Tabla de puntajes";
-          scoreboardHeaderDiv.appendChild(scoreboardHeader);
-          scoreboardDiv.appendChild(scoreboardHeaderDiv);
-          scoreboardDiv.appendChild(scoreboardTable);
-          console.log("Appended table to div");
-          var taskArea = document.getElementsByClassName('task-area')[0];
-          taskArea.parentNode.insertBefore(scoreboardDiv, document.getElementsByClassName('task-area')[0].nextSibling);
-        }
-
-        function populateBoard(board, project) {
-          //board es una tabla HTML
-          var collaborators_count = project.collaborators.length;
-          for (var i = 0; i < collaborators_count; i++) {
-            var collaborator = project.collaborators[i];
-            var row = board.insertRow();
-            var handle = row.insertCell();
-            handle.innerHTML = collaborator.handle;
-            var score = row.insertCell();
-            score.style.textAlign = 'center';
-            if (collaborator.points == null) {
-              score.innerHTML = '0';
-            }
-            else {
-              score.innerHTML = collaborator.points;
-            }
-          }
-
-        }
-
         function addContributionDiv(project, loggedUser) { //Como parámetro, el elemento html donde se quiera insertar el div de contribución
           var contributionDiv = document.createElement('div');
           contributionDiv.id = 'contributionDiv';
@@ -2375,7 +2416,9 @@ tbody.collapse.show {
           contributionDiv.appendChild(contributionHeaderDiv);
 
           var contributionDataDiv = document.createElement('div');
+          contributionDataDiv.id = "contributionDataDiv";
           var sinceSpan = document.createElement('span');
+          sinceSpan.id = "collaboratingSince";
           sinceSpan.style.display = 'inline-block';
 
           doGetRequest(serverUrl + "/users/" + loggedUser.id + "/collaboration/" + project.id, function(response) {
@@ -2401,13 +2444,14 @@ tbody.collapse.show {
           var firstContributionDate = userCollaboration.created_at;
           // '01/01/1900'; //placeholder. created_at es la primera; updated_at es la última
 
-          sinceSpan.innerHTML = 'Colaborando desde el <strong>' + firstContributionDate + '</strong>';
+          sinceSpan.innerHTML = 'Colaborando desde <strong>' + firstContributionDate + '</strong>';
 
           var lastContributionSpan = document.createElement('span');
+          lastContributionSpan.id = "lastContributionDate";
           lastContributionSpan.style.float = 'right';
           lastContributionSpan.style.display = 'inline-block';
           var lastContributionDateTime = userCollaboration.updated_at;
-          lastContributionSpan.innerHTML = 'Última contribución hace: <strong> '+ lastContributionDateTime +' </strong>';
+          lastContributionSpan.innerHTML = 'Última contribución el <strong> '+ lastContributionDateTime +' </strong>';
 
           contributionDataDiv.appendChild(sinceSpan);
           contributionDataDiv.appendChild(lastContributionSpan);
@@ -2415,6 +2459,7 @@ tbody.collapse.show {
           contributionDataDiv.appendChild(document.createElement('br'));
 
           var classificationsDiv = document.createElement('div');
+          classificationsDiv.id = "classificationsDiv";
           classificationsDiv.style.width = '50%';
           classificationsDiv.style.textAlign = 'center';
           classificationsDiv.style.display = 'inline-block';
@@ -2431,6 +2476,7 @@ tbody.collapse.show {
           contributionDataDiv.appendChild(classificationsDiv);
 
           var badgesDiv = document.createElement('div');
+          badgesDiv.id = "badgesDiv";
           badgesDiv.style.display = 'inline-block';
           badgesDiv.style.width = '20%';
           badgesDiv.style.position = 'absolute';
@@ -2457,8 +2503,18 @@ tbody.collapse.show {
           contributionDataDiv.appendChild(badgesDiv);
 
           var taskArea = document.getElementsByClassName('task-area')[0];
-          taskArea.appendChild(contributionDiv); //El div con lo de mi colaboración
-          taskArea.appendChild(contributionDataDiv);
+          var contributionDivContainer = document.createElement('div');
+          contributionDivContainer.style.display = "inline-grid";
+          contributionDivContainer.style.paddingLeft = "20%";
+
+          contributionDivContainer.appendChild(contributionDiv); //El div con lo de mi colaboración
+          contributionDivContainer.appendChild(contributionDataDiv);
+
+          wait_for_element("content-container", function() {
+            var taskContainerDiv = document.querySelector(".content-container").children[0];
+            taskContainerDiv.appendChild(contributionDivContainer);
+          });
+
         }
 
         function askToJoin() {
@@ -2512,7 +2568,6 @@ tbody.collapse.show {
         var project = JSON.parse(sessionStorage.getItem("project"));
         console.log("el proyecto es:");
         console.log(project);
-        console.log("STORED cargado");
 
         //Tengo que traerme los datos del proyecto actual (o sea, levantar el id a partir de lo anterior). A partir de esto, agarrar el colaborador actual de la lista de colaboradores del proyecto, y armar el coso de info de abajo
         is_user_site_logged_in();
@@ -2537,6 +2592,7 @@ tbody.collapse.show {
         }
 
         var scoreboardDiv = document.createElement('div');
+        scoreboardDiv.id = "scoreboardDiv";
         scoreboardDiv.style.marginLeft = '1em';
         scoreboardDiv.style.width = '25%';
         var scoreboardTable = document.createElement("table");
@@ -2558,8 +2614,9 @@ tbody.collapse.show {
           var taskArea = document.getElementsByClassName('task-area')[0];
           taskArea.parentNode.insertBefore(scoreboardDiv, document.getElementsByClassName('task-area')[0].nextSibling);
         }
-      //document.getElementsByClassName('task-container')[0].addEventListener("change", );
-      addEventToButton(project, user);
+        //document.getElementsByClassName('task-container')[0].addEventListener("change", );
+        var loggedUser = JSON.parse(sessionStorage.getItem("user_data"));
+        addEventToButton(project, loggedUser);
 
         var notAdded = true;
         var awaiting2 = setInterval(function() {
