@@ -2285,7 +2285,7 @@ tbody.collapse.show {
         return "notSupported";
       }
 
-      function addScoreboard(scoreboardDiv, project) { //Como parámetro, el elemento html donde se quiera insertar el div del scoreboard
+      function addScoreboard(scoreboardDiv, scoreboardTable, project) { //Como parámetro, el elemento html donde se quiera insertar el div del scoreboard
         //Div + tabla de puntos
 
         var row = scoreboardTable.insertRow();
@@ -2326,10 +2326,28 @@ tbody.collapse.show {
           }
         }
 
-      }      
+      }
 
       function update_scoreboard_and_contribution(project) {
         //Lo mejor será hacer un request directamente a projects/:project_id y generar la tabla de nuevo
+        current_project_name();
+        projectName = sessionStorage.getItem("current_project_name");
+
+        doGetRequest(serverUrl + "/projects/"+project.id, function(response) {
+        jsonResponse = JSON.parse(response.response);
+          if ((response.status == 200) || (response.status == 201)) {
+            console.log("Project GETed");
+            sessionStorage.removeItem("project");;
+            sessionStorage.setItem("project", JSON.stringify(jsonResponse))
+          }
+        });
+
+        var project = JSON.parse(sessionStorage.getItem("project"));
+
+        console.log("About to update the scoreboard.");
+        console.log("The project now is:");
+        console.log(project);
+
         document.getElementById("scoreboardDiv").remove();
         var scoreboardDiv = document.createElement('div');
         scoreboardDiv.id = "scoreboardDiv";
@@ -2340,7 +2358,7 @@ tbody.collapse.show {
         scoreboardTable.id = "tablaPuntaje";
         scoreboardTable.style.margin = "0px auto";
         scoreboardDiv.appendChild(scoreboardTable);
-        addScoreboard(scoreboardDiv, project);
+        addScoreboard(scoreboardDiv, scoreboardTable, project);
         populateBoard(scoreboardTable, project);
 
       }
@@ -2348,9 +2366,9 @@ tbody.collapse.show {
       function addEventToButton(project, user) {
         console.log("UGH dale loco");
         document.getElementsByClassName('continue major-button')[0].addEventListener("click", addEvent, false);
+        sessionStorage.setItem("jsTasks", "[]");
         function addEvent() {
           var buttonText = document.getElementsByClassName('continue major-button')[0].children[0].innerHTML;
-          sessionStorage.setItem("jsTasks", "[]");
           if (buttonText == 'Done') {
             //POSTear los puntos. Generar la colaboración si es necesario, y luego sumar los puntos.
             //console.log(project);
@@ -2361,6 +2379,9 @@ tbody.collapse.show {
             tasks = JSON.parse(sessionStorage.getItem("jsTasks"));
             tasks.push(taskType());
 
+            console.log("tareas al finalizar:");
+            console.log(tasks);
+
             if (!(userIsCollaborator(project,user))) {
               params = JSON.stringify({"user_id": user.id, "project_id": project.id});
               console.log(project.id);
@@ -2370,19 +2391,20 @@ tbody.collapse.show {
               });
             }
 
-            params = JSON.stringify({"tasks": jsTasks});
+            params = JSON.stringify({"tasks": tasks});
             var userCollaboration = JSON.parse(sessionStorage.getItem("user_collaboration"));
             console.log("Posteando la colaboración");
             doPostRequest(serverUrl + "/projects/"+project.id+"/collaborations/"+userCollaboration.id+"/increment", params, function(response) {
               //Esto me devuelve la colaboración actualizada
               jsonResponse = JSON.parse(response.response);
-              if (response.status == 200) {
+              console.log("La respuesta:");
+              console.log(response.status);
+              if (response.status == 202) {
                 sessionStorage.removeItem("user_collaboration");
                 sessionStorage.setItem("user_collaboration", JSON.stringify(jsonResponse));
                 update_scoreboard_and_contribution(project);
               }
               //Además, acá hay que actualizar tanto la tabla de puntos como el coso de colaboración de abajo
-            }
             });
             console.log("Reseteando las tareas");
             //Reseteo las tareas
@@ -2395,9 +2417,9 @@ tbody.collapse.show {
               tasks.push(taskType());
               jsTasks = JSON.stringify(tasks);
               sessionStorage.setItem("jsTasks", jsTasks);
+              console.log("tareas so far:");
+              console.log(tasks);
             }
-            console.log("tareas so far:");
-            console.log(tasks);
           }
         }
       }
@@ -2468,7 +2490,7 @@ tbody.collapse.show {
           classificationsDiv.appendChild(classificationsSpan);
           classificationsDiv.appendChild(document.createElement('br'));
           var classificationCountSpan = document.createElement('span');
-          var userClassificationCount = '0'; //placeholder
+          var userClassificationCount = userCollaboration.classification_count; //placeholder
           classificationCountSpan.innerHTML = '<strong>' + userClassificationCount + '</strong>';
           classificationsDiv.appendChild(classificationCountSpan);
           classificationsDiv.appendChild(document.createElement('br'));
@@ -2606,7 +2628,7 @@ tbody.collapse.show {
         console.log(project.collaborators);
 
         if (project.collaborators != undefined) {
-          addScoreboard(scoreboardDiv, project);
+          addScoreboard(scoreboardDiv, scoreboardTable, project);
           populateBoard(scoreboardTable, project);
         } else {
           console.log("Sin colaboradores");
