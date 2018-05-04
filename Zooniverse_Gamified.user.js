@@ -2278,11 +2278,38 @@ tbody.collapse.show {
         return false;
       }
 
+      function drawing_tool_element() {
+        //document.querySelector(".answer.undefined").children[0].children[0];
+        var answer_undefined = document.querySelector(".answer.undefined")
+        if (answer_undefined != undefined) {
+          return answer_undefined.children[0].children[0].name == "drawing-tool";
+        }
+        else {
+          return false;
+        }
+      }
+
+      function simple_question_element() {
+        answers = document.querySelector(".answers");
+        answers.children[0].tagName == "LABEL";
+      }
+
       function taskType() {
-        if (document.getElementsByClassName("survey-task").length > 0) return "survey";
-        if (document.getElementsByClassName('answer minor-button answer-button').length > 0) return "simpleQuestion";
-        if (document.getElementsByClassName('drawing-tool-button-input').length > 0) return "drawing";
+        //if (document.getElementsByClassName("survey-task").length > 0) return "survey";
+        //if (document.getElementsByClassName('answer minor-button answer-button').length > 0) return "simpleQuestion";
+        //if (document.getElementsByClassName('drawing-tool-button-input').length > 0) return "drawing";
+        if (simple_question_element()) return "simpleQuestion";
+        if (drawing_tool_element()) return "drawing";
         return "notSupported";
+      }
+
+      function next_continue_button() {
+        return document.getElementsByClassName("task-nav")[0].children[0].children[0];
+      }
+
+      function task_area_container() {
+        //Donde se agrega la tabla de puntos
+        return document.querySelector(".classifier");
       }
 
       function addScoreboard(scoreboardDiv, scoreboardTable, project) { //Como parámetro, el elemento html donde se quiera insertar el div del scoreboard
@@ -2304,8 +2331,11 @@ tbody.collapse.show {
         scoreboardDiv.appendChild(scoreboardHeaderDiv);
         scoreboardDiv.appendChild(scoreboardTable);
         console.log("Appended table to div");
-        var taskArea = document.getElementsByClassName('task-area')[0];
-        taskArea.parentNode.insertBefore(scoreboardDiv, document.getElementsByClassName('task-area')[0].nextSibling);
+        //var taskArea = document.getElementsByClassName('task-area')[0];
+        //var task_area_container = task_area_container();
+        //var classifier = document.querySelector(".classifier");
+        task_area_container().appendChild(scoreboardDiv);
+        //taskArea.parentNode.insertBefore(scoreboardDiv, document.getElementsByClassName('task-area')[0].nextSibling);
       }
 
       function populateBoard(board, project) {
@@ -2365,10 +2395,11 @@ tbody.collapse.show {
 
       function addEventToButton(project, user) {
         console.log("UGH dale loco");
-        document.getElementsByClassName('continue major-button')[0].addEventListener("click", addEvent, false);
+        //document.getElementsByClassName("task-nav")[0].children[0].children[0]
+        next_continue_button().addEventListener("click", addEvent, false);
         sessionStorage.setItem("jsTasks", "[]");
         function addEvent() {
-          var buttonText = document.getElementsByClassName('continue major-button')[0].children[0].innerHTML;
+          var buttonText = next_continue_button().children[0].innerHTML;
           if (buttonText == 'Done') {
             //POSTear los puntos. Generar la colaboración si es necesario, y luego sumar los puntos.
             //console.log(project);
@@ -2543,6 +2574,20 @@ tbody.collapse.show {
 
         }
 
+        function ask_log_in_gz() {
+          //Wait for element probablemente
+          contentContainer = document.querySelector(".content-container");
+          unite = document.createElement("div");
+          unite.className = "col-8 offset-5";
+          unite.style.width = "250px";
+          unite.style.height = "80px";
+          texto_unite = document.createElement("p");
+          texto_unite.textContent = "Logueate en GZoo para jugar";
+          unite.appendChild(texto_unite);
+          contentContainer.prepend(unite);
+
+        }
+
         var tableStyle = `element {
                           }
                           .table > caption + thead > tr:first-child > td, .table > caption + thead > tr:first-child > th, .table > colgroup + thead > tr:first-child > td, .table > colgroup + thead > tr:first-child > th, .table > thead:first-child > tr:first-child > td, .table > thead:first-child > tr:first-child > th {
@@ -2578,13 +2623,24 @@ tbody.collapse.show {
         //POSTeo de una. Si ya existe con ese nombre, me lo devuelve
         params = JSON.stringify({"name": projectName});
         doPostRequest(serverUrl + "/projects", params, function(response) {
-        jsonResponse = JSON.parse(response.response);
+          jsonResponse = JSON.parse(response.response);
           if ((response.status == 200) || (response.status == 201)) {
             console.log("Project POSTed");
             sessionStorage.removeItem("project");;
             sessionStorage.setItem("project", JSON.stringify(jsonResponse))
           }
         });
+
+        var scoreboardDiv = document.createElement('div');
+        scoreboardDiv.id = "scoreboardDiv";
+        scoreboardDiv.style.marginLeft = '1em';
+        scoreboardDiv.style.width = '25%';
+        var scoreboardTable = document.createElement("table");
+        scoreboardTable.className = 'table';
+        scoreboardTable.id = "tablaPuntaje";
+        scoreboardTable.style.margin = "0px auto";
+        scoreboardDiv.appendChild(scoreboardTable);
+        console.log("Table created");
 
         wait_for_stored_element("project");
         var project = JSON.parse(sessionStorage.getItem("project"));
@@ -2594,6 +2650,30 @@ tbody.collapse.show {
         //Tengo que traerme los datos del proyecto actual (o sea, levantar el id a partir de lo anterior). A partir de esto, agarrar el colaborador actual de la lista de colaboradores del proyecto, y armar el coso de info de abajo
         is_user_site_logged_in();
         user_site_logged_in = sessionStorage.getItem("user_site_logged_in");
+        if (user_site_logged_in) {
+          if (user_gz_logged_in()) {
+            var loggedUser = JSON.parse(sessionStorage.getItem("user_data"));
+
+            console.log("el usuario logueado es:");
+            console.log(loggedUser);
+
+            if (userIsCollaborator(project, loggedUser)) {
+              console.log("Por agregar el coso de contribution");
+              addContributionDiv(project, loggedUser);
+            }
+            else {
+              console.log("User no es colaborador, pedir que se una o algo");
+              askToJoin();
+            }
+          }
+          else {
+            console.log("No está logueado en GZ");
+            ask_log_in_gz();
+          }
+        } else {
+          console.log("No está logueado en Zooniverse");
+        }
+        /*
         if ((!(user_site_logged_in)) || (!(user_gz_logged_in))) {
           console.log("No está logueado o en sitio o en app");
           //No está logueado, debería para que ande. Poner un aviso en algún lado. Un alert ni da. Estaría bueno uno de esos cartelitos que hoverean. Para esto y para otras cosas
@@ -2612,29 +2692,21 @@ tbody.collapse.show {
             askToJoin();
           }
         }
+        */
+        //console.log("colaboradores del proyecto:");
+        //console.log(project.collaborators);
 
-        var scoreboardDiv = document.createElement('div');
-        scoreboardDiv.id = "scoreboardDiv";
-        scoreboardDiv.style.marginLeft = '1em';
-        scoreboardDiv.style.width = '25%';
-        var scoreboardTable = document.createElement("table");
-        scoreboardTable.className = 'table';
-        scoreboardTable.id = "tablaPuntaje";
-        scoreboardTable.style.margin = "0px auto";
-        scoreboardDiv.appendChild(scoreboardTable);
-        console.log("Table created");
-
-        console.log("colaboradores del proyecto:");
-        console.log(project.collaborators);
-
-        if (project.collaborators != undefined) {
-          addScoreboard(scoreboardDiv, scoreboardTable, project);
-          populateBoard(scoreboardTable, project);
-        } else {
-          console.log("Sin colaboradores");
-          scoreboardTable.innerHTML = "<center> Aún no hay colaboradores en este proyecto. Sé el primero </center>";
-          var taskArea = document.getElementsByClassName('task-area')[0];
-          taskArea.parentNode.insertBefore(scoreboardDiv, document.getElementsByClassName('task-area')[0].nextSibling);
+        if (!(project == undefined)) {
+          if (project.collaborators != undefined) {
+            console.log("La tabla de puntos:");
+            addScoreboard(scoreboardDiv, scoreboardTable, project);
+            populateBoard(scoreboardTable, project);
+          } else {
+            console.log("Sin colaboradores");
+            scoreboardTable.innerHTML = "<center> Aún no hay colaboradores en este proyecto. Sé el primero </center>";
+            var taskArea = document.getElementsByClassName('task-area')[0];
+            taskArea.parentNode.insertBefore(scoreboardDiv, document.getElementsByClassName('task-area')[0].nextSibling);
+          }
         }
         //document.getElementsByClassName('task-container')[0].addEventListener("change", );
         var loggedUser = JSON.parse(sessionStorage.getItem("user_data"));
