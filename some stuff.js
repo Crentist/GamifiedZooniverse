@@ -24,46 +24,46 @@
     executeScript();
   }
 
-  var modalStyle = `
-                  .modal {
-                      display: none; /* Hidden by default */
-                      position: fixed; /* Stay in place */
-                      z-index: 2; /* Sit on top */
-                      padding-top: 5%; /* Location of the box */
-                      left: 0;
-                      top: 0;
-                      width: 100%;
-                      height: 70%;
-                      overflow: auto; /* Enable scroll if needed */
-                      background-color: rgb(0,0,0); /* Fallback color */
-                      background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
-                  }
+    var modalStyle = `
+                    .modal {
+                        display: none; /* Hidden by default */
+                        position: fixed; /* Stay in place */
+                        z-index: 2; /* Sit on top */
+                        padding-top: 5%; /* Location of the box */
+                        left: 0;
+                        top: 0;
+                        width: 100%;
+                        height: 70%;
+                        overflow: auto; /* Enable scroll if needed */
+                        background-color: rgb(0,0,0); /* Fallback color */
+                        background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
+                    }
 
-                  /* Modal Content */
-                  .modal-content {
-                      background-color: #fefefe;
-                      margin: auto;
-                      padding: 20px;
-                      border: 1px solid #888;
-                      width: 95%;
-                      height: 90%;
-                  }
+                    /* Modal Content */
+                    .modal-content {
+                        background-color: #fefefe;
+                        margin: auto;
+                        padding: 20px;
+                        border: 1px solid #888;
+                        width: 95%;
+                        height: 90%;
+                    }
 
-                  /* The Close Button */
-                  .close {
-                      color: #aaaaaa;
-                      float: right;
-                      font-size: 20px;
-                      font-weight: bold;
-                  }
+                    /* The Close Button */
+                    .close {
+                        color: #aaaaaa;
+                        float: right;
+                        font-size: 20px;
+                        font-weight: bold;
+                    }
 
-                  .close:hover,
-                  .close:focus {
-                      color: #000;
-                      text-decoration: none;
-                      cursor: pointer;
-                  }
-               `
+                    .close:hover,
+                    .close:focus {
+                        color: #000;
+                        text-decoration: none;
+                        cursor: pointer;
+                    }
+                 `
 
   var formBootstrap = `
 .form-control {
@@ -1461,6 +1461,89 @@ tbody.collapse.show {
   serverUrl = "http://localhost:3000";
   var tasks = [];
 
+  function classify_page() {
+    return (window.location.href.indexOf('classify') > -1);
+  }
+
+  function classify_page_events(element) {
+    if (element.tagName == "BUTTON") {
+      if (element.children[0] != undefined) {
+        if (element.children[0].textContent == "Done") {
+          //Evento para el botón Done
+          //POSTear los puntos. Generar la colaboración si es necesario, y luego sumar los puntos.
+          //console.log(project);
+
+          //Quiere decir que hay una pregunta o algún tipo de tarea, que finalizará con un Done.
+          //Posiblemente indique que sea la última tarea
+          console.log("Clasificación completada.");
+          tasks = JSON.parse(sessionStorage.getItem("jsTasks"));
+          tasks.push(taskType());
+
+          console.log("tareas al finalizar:");
+          console.log(tasks);
+
+          if (!(userIsCollaborator(project,user))) {
+            params = JSON.stringify({"user_id": user.id, "project_id": project.id});
+            console.log(project.id);
+            console.log(params);
+            doPostRequest(serverUrl + "/projects/"+project.id+"/collaborations", params, function(response) {
+
+            });
+          }
+
+          params = JSON.stringify({"tasks": tasks});
+          var userCollaboration = JSON.parse(sessionStorage.getItem("user_collaboration"));
+          console.log("Posteando la colaboración");
+          doPostRequest(serverUrl + "/projects/"+project.id+"/collaborations/"+userCollaboration.id+"/increment", params, function(response) {
+            //Esto me devuelve la colaboración actualizada
+            jsonResponse = JSON.parse(response.response);
+            console.log("La respuesta:");
+            console.log(response.status);
+            if (response.status == 202) {
+              sessionStorage.removeItem("user_collaboration");
+              sessionStorage.setItem("user_collaboration", JSON.stringify(jsonResponse));
+              update_scoreboard_and_contribution(project);
+            }
+            //Además, acá hay que actualizar tanto la tabla de puntos como el coso de colaboración de abajo
+          });
+          console.log("Reseteando las tareas");
+          //Reseteo las tareas
+          sessionStorage.setItem("jsTasks", "[]");
+
+        } else {
+          if (element.children[0].textContent == "Next") {
+            //Evento para continuar, sumar tareas y eso
+          }
+        }
+      }
+    } else {
+      if (element.tagName == "SPAN") {
+        if (element.textContent == "Done") {
+
+        }
+      }
+    }
+  }  
+
+  function add_click_events() {
+    var containerDiv = document.querySelector(".app-layout");
+    containerDiv.addEventListener("click", function(event) {
+      //console.log("clickeado en:");
+      //console.log(event.target);
+      var element = event.target;
+      if (classify_page()) {
+        classify_page_events(element);
+      }
+
+
+      if (event.target.closest("a") != undefined) {
+        console.log(event.target.closest("a"));
+        currentHref = event.target.closest("a").href;
+        location.href = currentHref;
+      }
+    });
+  }
+
   function doGetRequest(url, callback) {
     GM.xmlHttpRequest({
       method: "GET",
@@ -1482,272 +1565,6 @@ tbody.collapse.show {
       synchronous: true,
       onload: function(response) {
         callback(response);
-      }
-    });
-  }
-
-  function classify_page() {
-    return (window.location.href.indexOf('classify') > -1);
-  }
-
-  function userIsCollaborator(project, loggedUser) {
-    if (project.collaborators != undefined) {
-      return ((project.collaborators.find(collaborator => collaborator.handle === loggedUser.handle)) != undefined);
-    }
-    return false;
-  }
-
-  function drawing_tool_element() {
-    var answer_undefined = document.querySelector(".answer.undefined");
-    if (answer_undefined != undefined) {
-      return answer_undefined.children[0].children[0].name == "drawing-tool";
-    }
-    else {
-      return false;
-    }
-  }
-
-  function simple_question_element() {
-    answers = document.querySelector(".answers");
-    return answers.children[0].tagName == "LABEL";
-  }
-
-  function taskType() {
-    if (simple_question_element()) return "simpleQuestion";
-    if (drawing_tool_element()) return "drawing";
-    return "notSupported";
-  }
-
-  function next_continue_button() {
-    return document.getElementsByClassName("task-nav")[0].children[0].children[0];
-  }
-
-  function task_area_container() {
-    //Donde se agrega la tabla de puntos
-    return document.querySelector(".classifier");
-  }
-
-  function addScoreboard(scoreboardDiv, scoreboardTable, project) { //Como parámetro, el elemento html donde se quiera insertar el div del scoreboard
-    //Div + tabla de puntos
-
-    var row = scoreboardTable.insertRow();
-    row.style.backgroundColor = "#43bbfd";
-    var rankCell = row.insertCell();
-    var nickCell = row.insertCell();
-    var scoreCell = row.insertCell();
-    rankCell.innerHTML = "#"
-    nickCell.innerHTML = "Nickname";
-    scoreCell.innerHTML = "Score";
-
-    var scoreboardHeaderDiv = document.createElement('div');
-    scoreboardHeaderDiv.style.textAlign = 'center';
-    scoreboardHeaderDiv.style.padding = '5px 5px 5px 5px';
-    var scoreboardHeader = document.createElement('strong');
-    scoreboardHeader.innerHTML = "Tabla de puntajes";
-    scoreboardHeaderDiv.appendChild(scoreboardHeader);
-    scoreboardDiv.appendChild(scoreboardHeaderDiv);
-    scoreboardDiv.appendChild(scoreboardTable);
-    console.log("Appended table to div");
-    task_area_container().appendChild(scoreboardDiv);
-  }
-
-  function populateBoard(board, ranking) {
-    //board es una tabla HTML
-    //ranking es un hash con las posiciones
-
-    //console.log("Estamos acá y no sé por qué hace cualquiera");
-    //console.log(ranking);
-    var loggedUser = JSON.parse(sessionStorage.getItem("user_data"));
-
-    for (var position in ranking) {
-      var row = board.insertRow();
-      var rank = row.insertCell();
-      var handle = row.insertCell();
-      var points = row.insertCell();
-      if ((loggedUser != null) && (loggedUser.handle == ranking[position]["handle"])) {
-        rank.innerHTML = "<strong>"+position+"</strong>";
-        handle.innerHTML = "<strong>"+ranking[position]["handle"]+"</strong>";
-        points.innerHTML = "<strong>"+ranking[position]["points"]+"</strong>";
-      } else {
-        rank.innerHTML = position;
-        handle.innerHTML = ranking[position]["handle"];
-        points.innerHTML = ranking[position]["points"];
-      }
-    }
-  }
-
-  function update_scoreboard_and_contribution(project) {
-    //Lo mejor será hacer un request directamente a projects/:project_id y generar la tabla de nuevo
-    current_project_name();
-    projectName = sessionStorage.getItem("current_project_name");
-
-    doGetRequest(serverUrl + "/projects/"+project.id, function(response) {
-    jsonResponse = JSON.parse(response.response);
-      if ((response.status == 200) || (response.status == 201)) {
-        console.log("Project GETed");
-        sessionStorage.removeItem("project");;
-        sessionStorage.setItem("project", JSON.stringify(jsonResponse))
-      }
-    });
-
-    var project = JSON.parse(sessionStorage.getItem("project"));
-
-    var loggedUser = JSON.parse(sessionStorage.getItem("user_data"));
-    if (loggedUser == null) {
-      user_id = null;
-    } else {
-      user_id = loggedUser.id;
-    }
-    doGetRequest(serverUrl + "/projects/"+project.id+"/ranking/"+user_id, function(response) {
-    jsonResponse = JSON.parse(response.response);
-      if ((response.status == 200) || (response.status == 201)) {
-        console.log("Project ranking GETed");
-        sessionStorage.removeItem("ranking");;
-        sessionStorage.setItem("ranking", JSON.stringify(jsonResponse))
-      }
-    });
-
-    console.log("About to update the scoreboard.");
-    console.log("The project now is:");
-    console.log(project);
-
-    document.getElementById("scoreboardDiv").remove();
-    var scoreboardDiv = document.createElement('div');
-    scoreboardDiv.id = "scoreboardDiv";
-    scoreboardDiv.style.marginLeft = '1em';
-    scoreboardDiv.style.width = '25%';
-    var scoreboardTable = document.createElement("table");
-    scoreboardTable.className = 'table';
-    scoreboardTable.id = "tablaPuntaje";
-    scoreboardTable.style.margin = "0px auto";
-    scoreboardDiv.appendChild(scoreboardTable);
-    addScoreboard(scoreboardDiv, scoreboardTable, project);
-    populateBoard(scoreboardTable, ranking);
-
-  }
-
-  function task_done_event(project, user) {
-    //POSTear los puntos. Generar la colaboración si es necesario, y luego sumar los puntos.
-    //console.log(project);
-
-    //Quiere decir que hay una pregunta o algún tipo de tarea, que finalizará con un Done.
-    //Posiblemente indique que sea la última tarea
-    console.log("Clasificación completada.");
-    tasks = JSON.parse(sessionStorage.getItem("jsTasks"));
-    tasks.push(taskType());
-
-    console.log("tareas al finalizar:");
-    console.log(tasks);
-
-    if (!(userIsCollaborator(project,user))) {
-      params = JSON.stringify({"user_id": user.id, "project_id": project.id});
-      console.log(project.id);
-      console.log(params);
-      doPostRequest(serverUrl + "/projects/"+project.id+"/collaborations", params, function(response) {
-
-      });
-    }
-
-    params = JSON.stringify({"tasks": tasks});
-    var userCollaboration = JSON.parse(sessionStorage.getItem("user_collaboration"));
-    console.log("Posteando la colaboración");
-    doPostRequest(serverUrl + "/projects/"+project.id+"/collaborations/"+userCollaboration.id+"/increment", params, function(response) {
-      //Esto me devuelve la colaboración actualizada
-      jsonResponse = JSON.parse(response.response);
-      console.log("La respuesta:");
-      console.log(response.status);
-      if (response.status == 202) {
-        sessionStorage.removeItem("user_collaboration");
-        sessionStorage.setItem("user_collaboration", JSON.stringify(jsonResponse));
-        update_scoreboard_and_contribution(project);
-      }
-      //Además, acá hay que actualizar tanto la tabla de puntos como el coso de colaboración de abajo
-    });
-    console.log("Reseteando las tareas");
-    //Reseteo las tareas
-    sessionStorage.setItem("jsTasks", "[]");
-  }
-
-  function task_next_event() {
-     //Agregar el tipo de tarea que se acaba de resolver. Si el Next indica que se pasa a la siguiente tarea, no hacer nada.
-    if (document.getElementsByClassName('classification-summary')[0] == undefined) {
-      console.log("Tarea completada. Pasando a la siguiente");
-      tasks = JSON.parse(sessionStorage.getItem("jsTasks"));
-      tasks.push(taskType());
-      jsTasks = JSON.stringify(tasks);
-      sessionStorage.setItem("jsTasks", jsTasks);
-      console.log("tareas so far:");
-      console.log(tasks);
-    }
-  }
-
-  function task_cleanup() {
-    sessionStorage.setItem("jsTasks", "[]");
-    console.log("Tasks cleaned up");
-  }
-
-  function classify_page_events(element, project, loggedUser) {
-    if (element.tagName == "BUTTON") {
-      var element_span = element.children[0]
-      if (element_span != undefined) {
-        if (element_span.textContent == "Done") {
-          //Evento para el botón Done
-          task_done_event(project, loggedUser);
-        } else {
-          if (element_span.textContent == "Next") {
-            //Evento para continuar, sumar tareas y eso
-            task_next_event();
-          } else {
-            if (element_span.textContent == "Back") {
-              // ???
-              task_cleanup();
-            }
-          }
-        }
-      }
-    } else {
-      if (element.tagName == "SPAN") {
-        if (element.textContent == "Done") {
-          if (element.parentNode.tagName == "BUTTON") {
-            task_done_event(project, loggedUser);
-          }
-        } else {
-          if (element.textContent == "Next") {
-            if (element.parentNode.tagName == "BUTTON") {
-              //Evento para continuar, sumar tareas y eso
-              task_next_event();
-            }
-          } else {
-            if (element.textContent == "Back") {
-              // ???
-              task_cleanup();
-            }
-          }
-        }
-      }
-    }
-  }
-
-  function add_click_events() {
-    var containerDiv = document.querySelector(".app-layout");
-    containerDiv.addEventListener("click", function(event) {
-      //console.log("clickeado en:");
-      //console.log(event.target);
-      var element = event.target;
-      if (classify_page()) {
-        var project = JSON.parse(sessionStorage.getItem("project"));
-        var loggedUser = JSON.parse(sessionStorage.getItem("user_data"));
-        var tasks = sessionStorage.getItem("jsTasks");
-        if (tasks == undefined) {
-          sessionStorage.setItem("jsTasks", "[]");
-        }
-        classify_page_events(element, project, loggedUser);
-      }
-
-      if (event.target.closest("a") != undefined) {
-        console.log(event.target.closest("a"));
-        currentHref = event.target.closest("a").href;
-        location.href = currentHref;
       }
     });
   }
@@ -1932,6 +1749,7 @@ tbody.collapse.show {
           //Un iterador con un case/switch ???
         }
       });
+
     });
 
     return form;
@@ -2370,6 +2188,7 @@ tbody.collapse.show {
               profileDiv.className = "container";
               profileDiv.style.borderStyle = "dotted";
               profileDiv.style.minHeight = "100px";
+              //coso.id = "1111111223";
               gZooModal.appendChild(profileDiv);
 
               //<div class="container" style="border-style: dotted;min-height: 100px;"></div>
@@ -2444,7 +2263,9 @@ tbody.collapse.show {
       }
       else {
         //Nada. O bien, un coso para que loguee
+
       }
+
     }
 
     //En la pantalla principal del proyecto
@@ -2497,8 +2318,12 @@ tbody.collapse.show {
             buttonsDiv.appendChild(joinButton);
             console.log("Attached Join button");
           });
+
+
+
         }
       }
+
     }
 
     //En la clasificación de un proyecto. Funcionalidad específica para esa pantalla
@@ -2511,6 +2336,190 @@ tbody.collapse.show {
           gameOn();
         }
       }, 100);
+
+      function userIsCollaborator(project, loggedUser) {
+        if (project.collaborators != undefined) {
+          return ((project.collaborators.find(collaborator => collaborator.handle === loggedUser.handle)) != undefined);
+        }
+        return false;
+      }
+
+      function drawing_tool_element() {
+        //document.querySelector(".answer.undefined").children[0].children[0];
+        var answer_undefined = document.querySelector(".answer.undefined")
+        if (answer_undefined != undefined) {
+          return answer_undefined.children[0].children[0].name == "drawing-tool";
+        }
+        else {
+          return false;
+        }
+      }
+
+      function simple_question_element() {
+        answers = document.querySelector(".answers");
+        answers.children[0].tagName == "LABEL";
+      }
+
+      function taskType() {
+        //if (document.getElementsByClassName("survey-task").length > 0) return "survey";
+        //if (document.getElementsByClassName('answer minor-button answer-button').length > 0) return "simpleQuestion";
+        //if (document.getElementsByClassName('drawing-tool-button-input').length > 0) return "drawing";
+        if (simple_question_element()) return "simpleQuestion";
+        if (drawing_tool_element()) return "drawing";
+        return "notSupported";
+      }
+
+      function next_continue_button() {
+        return document.getElementsByClassName("task-nav")[0].children[0].children[0];
+      }
+
+      function task_area_container() {
+        //Donde se agrega la tabla de puntos
+        return document.querySelector(".classifier");
+      }
+
+      function addScoreboard(scoreboardDiv, scoreboardTable, project) { //Como parámetro, el elemento html donde se quiera insertar el div del scoreboard
+        //Div + tabla de puntos
+
+        var row = scoreboardTable.insertRow();
+        row.style.backgroundColor = "#43bbfd";
+        var nickCell = row.insertCell(0);
+        var scoreCell = row.insertCell(-1);
+        nickCell.innerHTML = "Nickname";
+        scoreCell.innerHTML = "Score";
+
+        var scoreboardHeaderDiv = document.createElement('div');
+        scoreboardHeaderDiv.style.textAlign = 'center';
+        scoreboardHeaderDiv.style.padding = '5px 5px 5px 5px';
+        var scoreboardHeader = document.createElement('strong');
+        scoreboardHeader.innerHTML = "Tabla de puntajes";
+        scoreboardHeaderDiv.appendChild(scoreboardHeader);
+        scoreboardDiv.appendChild(scoreboardHeaderDiv);
+        scoreboardDiv.appendChild(scoreboardTable);
+        console.log("Appended table to div");
+        //var taskArea = document.getElementsByClassName('task-area')[0];
+        //var task_area_container = task_area_container();
+        //var classifier = document.querySelector(".classifier");
+        task_area_container().appendChild(scoreboardDiv);
+        //taskArea.parentNode.insertBefore(scoreboardDiv, document.getElementsByClassName('task-area')[0].nextSibling);
+      }
+
+      function populateBoard(board, project) {
+        //board es una tabla HTML
+        var collaborators_count = project.collaborators.length;
+        for (var i = 0; i < collaborators_count; i++) {
+          var collaborator = project.collaborators[i];
+          var row = board.insertRow();
+          var handle = row.insertCell();
+          handle.innerHTML = collaborator.handle;
+          var score = row.insertCell();
+          score.style.textAlign = 'center';
+          if (collaborator.points == null) {
+            score.innerHTML = '0';
+          }
+          else {
+            score.innerHTML = collaborator.points;
+          }
+        }
+
+      }
+
+      function update_scoreboard_and_contribution(project) {
+        //Lo mejor será hacer un request directamente a projects/:project_id y generar la tabla de nuevo
+        current_project_name();
+        projectName = sessionStorage.getItem("current_project_name");
+
+        doGetRequest(serverUrl + "/projects/"+project.id, function(response) {
+        jsonResponse = JSON.parse(response.response);
+          if ((response.status == 200) || (response.status == 201)) {
+            console.log("Project GETed");
+            sessionStorage.removeItem("project");;
+            sessionStorage.setItem("project", JSON.stringify(jsonResponse))
+          }
+        });
+
+        var project = JSON.parse(sessionStorage.getItem("project"));
+
+        console.log("About to update the scoreboard.");
+        console.log("The project now is:");
+        console.log(project);
+
+        document.getElementById("scoreboardDiv").remove();
+        var scoreboardDiv = document.createElement('div');
+        scoreboardDiv.id = "scoreboardDiv";
+        scoreboardDiv.style.marginLeft = '1em';
+        scoreboardDiv.style.width = '25%';
+        var scoreboardTable = document.createElement("table");
+        scoreboardTable.className = 'table';
+        scoreboardTable.id = "tablaPuntaje";
+        scoreboardTable.style.margin = "0px auto";
+        scoreboardDiv.appendChild(scoreboardTable);
+        addScoreboard(scoreboardDiv, scoreboardTable, project);
+        populateBoard(scoreboardTable, project);
+
+      }
+
+      function addEventToButton(project, user) {
+        console.log("UGH dale loco");
+        //document.getElementsByClassName("task-nav")[0].children[0].children[0]
+        next_continue_button().addEventListener("click", addEvent, false);
+        sessionStorage.setItem("jsTasks", "[]");
+        function addEvent() {
+          var buttonText = next_continue_button().children[0].innerHTML;
+          if (buttonText == 'Done') {
+            //POSTear los puntos. Generar la colaboración si es necesario, y luego sumar los puntos.
+            //console.log(project);
+
+              //Quiere decir que hay una pregunta o algún tipo de tarea, que finalizará con un Done.
+              //Posiblemente indique que sea la última tarea
+            console.log("Clasificación completada.");
+            tasks = JSON.parse(sessionStorage.getItem("jsTasks"));
+            tasks.push(taskType());
+
+            console.log("tareas al finalizar:");
+            console.log(tasks);
+
+            if (!(userIsCollaborator(project,user))) {
+              params = JSON.stringify({"user_id": user.id, "project_id": project.id});
+              console.log(project.id);
+              console.log(params);
+              doPostRequest(serverUrl + "/projects/"+project.id+"/collaborations", params, function(response) {
+
+              });
+            }
+
+            params = JSON.stringify({"tasks": tasks});
+            var userCollaboration = JSON.parse(sessionStorage.getItem("user_collaboration"));
+            console.log("Posteando la colaboración");
+            doPostRequest(serverUrl + "/projects/"+project.id+"/collaborations/"+userCollaboration.id+"/increment", params, function(response) {
+              //Esto me devuelve la colaboración actualizada
+              jsonResponse = JSON.parse(response.response);
+              console.log("La respuesta:");
+              console.log(response.status);
+              if (response.status == 202) {
+                sessionStorage.removeItem("user_collaboration");
+                sessionStorage.setItem("user_collaboration", JSON.stringify(jsonResponse));
+                update_scoreboard_and_contribution(project);
+              }
+              //Además, acá hay que actualizar tanto la tabla de puntos como el coso de colaboración de abajo
+            });
+            console.log("Reseteando las tareas");
+            //Reseteo las tareas
+            sessionStorage.setItem("jsTasks", "[]");
+          } else if (buttonText == 'Next') {
+            //Agregar el tipo de tarea que se acaba de resolver. Si el Next indica que se pasa a la siguiente tarea, no hacer nada.
+            if (document.getElementsByClassName('classification-summary')[0] == undefined) {
+              console.log("Tarea completada. Pasando a la siguiente");
+              tasks = JSON.parse(sessionStorage.getItem("jsTasks"));
+              tasks.push(taskType());
+              jsTasks = JSON.stringify(tasks);
+              sessionStorage.setItem("jsTasks", jsTasks);
+              console.log("tareas so far:");
+              console.log(tasks);
+            }
+          }
+        }
+      }
 
       function gameOn() {
         function addContributionDiv(project, loggedUser) { //Como parámetro, el elemento html donde se quiera insertar el div de contribución
@@ -2530,7 +2539,6 @@ tbody.collapse.show {
           var sinceSpan = document.createElement('span');
           sinceSpan.id = "collaboratingSince";
           sinceSpan.style.display = 'inline-block';
-          sinceSpan.style.marginRight = '10px';
 
           doGetRequest(serverUrl + "/users/" + loggedUser.id + "/collaboration/" + project.id, function(response) {
             console.log("La respuesta de user/collaboration:");
@@ -2555,7 +2563,7 @@ tbody.collapse.show {
           var firstContributionDate = userCollaboration.created_at;
           // '01/01/1900'; //placeholder. created_at es la primera; updated_at es la última
 
-          sinceSpan.innerHTML = 'Colaborando desde el <strong>' + firstContributionDate + '</strong>';
+          sinceSpan.innerHTML = 'Colaborando desde <strong>' + firstContributionDate + '</strong>';
 
           var lastContributionSpan = document.createElement('span');
           lastContributionSpan.id = "lastContributionDate";
@@ -2613,6 +2621,7 @@ tbody.collapse.show {
 
           contributionDataDiv.appendChild(badgesDiv);
 
+          var taskArea = document.getElementsByClassName('task-area')[0];
           var contributionDivContainer = document.createElement('div');
           contributionDivContainer.style.display = "inline-grid";
           contributionDivContainer.style.paddingLeft = "20%";
@@ -2620,40 +2629,15 @@ tbody.collapse.show {
           contributionDivContainer.appendChild(contributionDiv); //El div con lo de mi colaboración
           contributionDivContainer.appendChild(contributionDataDiv);
 
-
           wait_for_element("content-container", function() {
             var taskContainerDiv = document.querySelector(".content-container").children[0];
-            sibling_div = document.querySelector(".classifier");
-            sibling_div.parentNode.insertBefore(contributionDivContainer, sibling_div.nextSibling);
-            //taskContainerDiv.appendChild(contributionDivContainer);
+            taskContainerDiv.appendChild(contributionDivContainer);
           });
 
         }
 
         function askToJoin() {
-          //Wait for element probablemente
-          contentContainer = document.querySelector(".content-container");
-          unite = document.createElement("div");
-          unite.className = "col-8 offset-5";
-          unite.style.width = "250px";
-          unite.style.height = "80px";
-          texto_unite = document.createElement("p");
-          texto_unite.textContent = "Unite al proyecto para jugar!";
-          var joinButton = document.createElement("button");
-          joinButton.textContent = "Unirse al proyecto en GZoo";
 
-          joinButton.addEventListener("click", function() {
-            current_project_name();
-            var current_project = sessionStorage.getItem("current_project_name");
-            params = JSON.stringify({"project": current_project, "site": "zooniverse.org"});
-            var user_id = sessionStorage.getItem("user_id");
-            doPostRequest(serverUrl+"/users/"+user_id+"/join_project", params, function(response) {
-              // >>>>>>>> CONTINUE HERE
-              location.reload(); //O algo que no necesariamente recargue todo
-            });
-          });
-          unite.appendChild(texto_unite);
-          contentContainer.prepend(unite);
         }
 
         function ask_log_in_gz() {
@@ -2729,37 +2713,6 @@ tbody.collapse.show {
         console.log("el proyecto es:");
         console.log(project);
 
-        if (!(project == undefined)) {
-          if (project.collaborators != undefined) {
-            console.log("La tabla de puntos:");
-            addScoreboard(scoreboardDiv, scoreboardTable, project);
-            var loggedUser = JSON.parse(sessionStorage.getItem("user_data"));
-            var user_id;
-            if (loggedUser == null) {
-              user_id = null;
-            } else {
-              user_id = loggedUser.id;
-            }
-            doGetRequest(serverUrl + "/projects/"+project.id+"/ranking/"+user_id, function(response) {
-            jsonResponse = JSON.parse(response.response);
-              if ((response.status == 200) || (response.status == 201)) {
-                console.log("Project ranking GETed");
-                sessionStorage.removeItem("ranking");;
-                sessionStorage.setItem("ranking", JSON.stringify(jsonResponse))
-              }
-            });
-
-            var ranking = JSON.parse(sessionStorage.getItem("ranking"));
-
-            populateBoard(scoreboardTable, ranking);
-          } else {
-            console.log("Sin colaboradores");
-            scoreboardTable.innerHTML = "<center> Aún no hay colaboradores en este proyecto. Sé el primero </center>";
-            var taskArea = document.getElementsByClassName('task-area')[0];
-            taskArea.parentNode.insertBefore(scoreboardDiv, document.getElementsByClassName('task-area')[0].nextSibling);
-          }
-        }
-
         //Tengo que traerme los datos del proyecto actual (o sea, levantar el id a partir de lo anterior). A partir de esto, agarrar el colaborador actual de la lista de colaboradores del proyecto, y armar el coso de info de abajo
         is_user_site_logged_in();
         user_site_logged_in = sessionStorage.getItem("user_site_logged_in");
@@ -2773,7 +2726,6 @@ tbody.collapse.show {
             if (userIsCollaborator(project, loggedUser)) {
               console.log("Por agregar el coso de contribution");
               addContributionDiv(project, loggedUser);
-              console.log("Por llenar la tabla centrada en el usuario");
             }
             else {
               console.log("User no es colaborador, pedir que se una o algo");
@@ -2787,6 +2739,64 @@ tbody.collapse.show {
         } else {
           console.log("No está logueado en Zooniverse");
         }
+        /*
+        if ((!(user_site_logged_in)) || (!(user_gz_logged_in))) {
+          console.log("No está logueado o en sitio o en app");
+          //No está logueado, debería para que ande. Poner un aviso en algún lado. Un alert ni da. Estaría bueno uno de esos cartelitos que hoverean. Para esto y para otras cosas
+        } else {
+          var loggedUser = JSON.parse(sessionStorage.getItem("user_data"));
+
+          console.log("el usuario logueado es:");
+          console.log(loggedUser);
+
+          if (userIsCollaborator(project, loggedUser)) {
+            console.log("Por agregar el coso de contribution");
+            addContributionDiv(project, loggedUser);
+          }
+          else {
+            console.log("User no es colaborador, pedir que se una o algo");
+            askToJoin();
+          }
+        }
+        */
+        //console.log("colaboradores del proyecto:");
+        //console.log(project.collaborators);
+
+        if (!(project == undefined)) {
+          if (project.collaborators != undefined) {
+            console.log("La tabla de puntos:");
+            addScoreboard(scoreboardDiv, scoreboardTable, project);
+            populateBoard(scoreboardTable, project);
+          } else {
+            console.log("Sin colaboradores");
+            scoreboardTable.innerHTML = "<center> Aún no hay colaboradores en este proyecto. Sé el primero </center>";
+            var taskArea = document.getElementsByClassName('task-area')[0];
+            taskArea.parentNode.insertBefore(scoreboardDiv, document.getElementsByClassName('task-area')[0].nextSibling);
+          }
+        }
+        //document.getElementsByClassName('task-container')[0].addEventListener("change", );
+        var loggedUser = JSON.parse(sessionStorage.getItem("user_data"));
+        addEventToButton(project, loggedUser);
+
+        var notAdded = true;
+        var awaiting2 = setInterval(function() {
+          var sumario = document.getElementsByClassName('classification-summary')[0];
+          var markQuest = document.getElementsByClassName('markdown question')[0];
+            if ((sumario != undefined) && notAdded) {
+              addEventToButton(project, user);
+              notAdded = false;
+              var awaiting3 = setInterval(function() {
+                var markQuest = document.getElementsByClassName('markdown question')[0];
+                if (markQuest != undefined) {
+                  addEventToButton(project, user);
+                  clearInterval(awaiting3);
+                }
+              }, 100);
+            } else if (sumario == undefined) {
+              notAdded = true;
+            }
+        }, 100); //end awaiting2
+
       }
     }
   }
