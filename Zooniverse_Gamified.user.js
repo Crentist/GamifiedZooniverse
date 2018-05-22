@@ -1531,7 +1531,7 @@ tbody.collapse.show {
   }
 
   function simple_question_element() {
-    answers = document.querySelector(".answers");
+    var answers = document.querySelector(".answers");
     return answers.children[0].tagName == "LABEL";
   }
 
@@ -1550,7 +1550,7 @@ tbody.collapse.show {
     return document.querySelector(".classifier");
   }
 
-  function addScoreboard(scoreboardDiv, scoreboardTable, project) { //Como parámetro, el elemento html donde se quiera insertar el div del scoreboard
+  function addScoreboard(scoreboardDiv, scoreboardTable) { //Como parámetro, el elemento html donde se quiera insertar el div del scoreboard
     //Div + tabla de puntos
 
     var row = scoreboardTable.insertRow();
@@ -1602,10 +1602,10 @@ tbody.collapse.show {
   function update_scoreboard_and_contribution(project) {
     //Lo mejor será hacer un request directamente a projects/:project_id y generar la tabla de nuevo
     current_project_name();
-    projectName = sessionStorage.getItem("current_project_name");
+    var projectName = sessionStorage.getItem("current_project_name");
 
     doGetRequest(serverUrl + "/projects/"+project.id, function(response) {
-    jsonResponse = JSON.parse(response.response);
+    var jsonResponse = JSON.parse(response.response);
       if ((response.status == 200) || (response.status == 201)) {
         console.log("Project GETed");
         sessionStorage.removeItem("project");;
@@ -1616,13 +1616,15 @@ tbody.collapse.show {
     var project = JSON.parse(sessionStorage.getItem("project"));
 
     var loggedUser = JSON.parse(sessionStorage.getItem("user_data"));
+    var user_id;
+
     if (loggedUser == null) {
       user_id = null;
     } else {
       user_id = loggedUser.id;
     }
     doGetRequest(serverUrl + "/projects/"+project.id+"/ranking/"+user_id, function(response) {
-    jsonResponse = JSON.parse(response.response);
+    var jsonResponse = JSON.parse(response.response);
       if ((response.status == 200) || (response.status == 201)) {
         console.log("Project ranking GETed");
         sessionStorage.removeItem("ranking");;
@@ -1663,7 +1665,7 @@ tbody.collapse.show {
     console.log(tasks);
 
     if (!(userIsCollaborator(project,user))) {
-      params = JSON.stringify({"user_id": user.id, "project_id": project.id});
+      var params = JSON.stringify({"user_id": user.id, "project_id": project.id});
       console.log(project.id);
       console.log(params);
       doPostRequest(serverUrl + "/projects/"+project.id+"/collaborations", params, function(response) {
@@ -1671,12 +1673,12 @@ tbody.collapse.show {
       });
     }
 
-    params = JSON.stringify({"tasks": tasks});
+    var params = JSON.stringify({"tasks": tasks});
     var userCollaboration = JSON.parse(sessionStorage.getItem("user_collaboration"));
     console.log("Posteando la colaboración");
     doPostRequest(serverUrl + "/projects/"+project.id+"/collaborations/"+userCollaboration.id+"/increment", params, function(response) {
       //Esto me devuelve la colaboración actualizada
-      jsonResponse = JSON.parse(response.response);
+      var jsonResponse = JSON.parse(response.response);
       console.log("La respuesta:");
       console.log(response.status);
       if (response.status == 202) {
@@ -1695,9 +1697,9 @@ tbody.collapse.show {
      //Agregar el tipo de tarea que se acaba de resolver. Si el Next indica que se pasa a la siguiente tarea, no hacer nada.
     if (document.getElementsByClassName('classification-summary')[0] == undefined) {
       console.log("Tarea completada. Pasando a la siguiente");
-      tasks = JSON.parse(sessionStorage.getItem("jsTasks"));
+      var tasks = JSON.parse(sessionStorage.getItem("jsTasks"));
       tasks.push(taskType());
-      jsTasks = JSON.stringify(tasks);
+      var jsTasks = JSON.stringify(tasks);
       sessionStorage.setItem("jsTasks", jsTasks);
       console.log("tareas so far:");
       console.log(tasks);
@@ -1789,7 +1791,7 @@ tbody.collapse.show {
         joinButton.addEventListener("click", function() {
           current_project_name();
           var current_project = sessionStorage.getItem("current_project_name");
-          params = JSON.stringify({"project": current_project, "site": "zooniverse.org"});
+          var params = JSON.stringify({"project": current_project, "site": "zooniverse.org"});
           var user_id = sessionStorage.getItem("user_id");
           doPostRequest(serverUrl+"/users/"+user_id+"/join_project", params, function(response) {
             location.reload(); //O algo que no necesariamente recargue todo
@@ -1859,7 +1861,7 @@ tbody.collapse.show {
         doGetRequest(serverUrl + "/users/" + loggedUser.id + "/collaboration/" + project.id, function(response) {
           console.log("La respuesta de user/collaboration:");
           console.log(response);
-          jsonResponse = JSON.parse(response.response);
+          var jsonResponse = JSON.parse(response.response);
           console.log("Colaboración del usuario en el proyecto:");
           console.log(jsonResponse);
           if (response.status == 200) {
@@ -1944,15 +1946,15 @@ tbody.collapse.show {
         contributionDivContainer.appendChild(contributionDataDiv);
 
         wait_for_element("content-container", function() {
-          sibling_div = document.querySelector(".classifier");
+          var sibling_div = document.querySelector(".classifier");
           sibling_div.parentNode.insertBefore(contributionDivContainer, sibling_div.nextSibling);
         });
       }
 
       function askToJoin() {
         //Wait for element probablemente
-        contentContainer = document.querySelector(".content-container");
-        unite = document.createElement("div");
+        var contentContainer = document.querySelector(".content-container");
+        var unite = document.createElement("div");
         unite.className = "col-8 offset-5";
         unite.style.width = "250px";
         unite.style.height = "80px";
@@ -1964,7 +1966,7 @@ tbody.collapse.show {
         joinButton.addEventListener("click", function() {
           current_project_name();
           var current_project = sessionStorage.getItem("current_project_name");
-          params = JSON.stringify({"project": current_project, "site": "zooniverse.org"});
+          var params = JSON.stringify({"project": current_project, "site": "zooniverse.org"});
           var user_id = sessionStorage.getItem("user_id");
           doPostRequest(serverUrl+"/users/"+user_id+"/join_project", params, function(response) {
             location.reload(); //O algo que no necesariamente recargue todo
@@ -1975,12 +1977,12 @@ tbody.collapse.show {
       }
 
       function ask_log_in_zoo() {
-        contentContainer = document.querySelector(".content-container");
-        unite = document.createElement("div");
+        var contentContainer = document.querySelector(".content-container");
+        var unite = document.createElement("div");
         unite.className = "col-8 offset-5";
         unite.style.width = "350px";
         unite.style.height = "80px";
-        texto_unite = document.createElement("p");
+        var texto_unite = document.createElement("p");
         texto_unite.textContent = "Logueate en Zooniverse para jugar";
         unite.appendChild(texto_unite);
         contentContainer.prepend(unite);
@@ -1988,12 +1990,12 @@ tbody.collapse.show {
 
       function ask_log_in_gz() {
         //Wait for element probablemente
-        contentContainer = document.querySelector(".content-container");
-        unite = document.createElement("div");
+        var contentContainer = document.querySelector(".content-container");
+        var unite = document.createElement("div");
         unite.className = "col-8 offset-5";
         unite.style.width = "350px";
         unite.style.height = "80px";
-        texto_unite = document.createElement("p");
+        var texto_unite = document.createElement("p");
         texto_unite.textContent = "Logueate en GZoo para jugar";
         unite.appendChild(texto_unite);
         contentContainer.prepend(unite);
@@ -2004,7 +2006,7 @@ tbody.collapse.show {
         if (!(project == undefined)) { //Mepa que no es necesario, lo dejo por las dudas
           if ((project.collaborators != undefined) && (project.collaborators.length > 0)) {
             console.log("La tabla de puntos:");
-            addScoreboard(scoreboardDiv, scoreboardTable, project);
+            addScoreboard(scoreboardDiv, scoreboardTable);
             var loggedUser = JSON.parse(sessionStorage.getItem("user_data"));
             var user_id;
             if (loggedUser == null) {
@@ -2013,7 +2015,7 @@ tbody.collapse.show {
               user_id = loggedUser.id;
             }
             doGetRequest(serverUrl + "/projects/"+project.id+"/ranking/"+user_id, function(response) {
-            jsonResponse = JSON.parse(response.response);
+            var jsonResponse = JSON.parse(response.response);
               if ((response.status == 200) || (response.status == 201)) {
                 console.log("Project ranking GETed");
                 sessionStorage.removeItem("ranking");;
@@ -2066,12 +2068,12 @@ tbody.collapse.show {
       console.log("Found classify element");
 
       current_project_name();
-      projectName = sessionStorage.getItem("current_project_name");
+      var projectName = sessionStorage.getItem("current_project_name");
 
       //POSTeo de una. Si ya existe con ese nombre, me lo devuelve
-      params = JSON.stringify({"name": projectName});
+      var params = JSON.stringify({"name": projectName});
       doPostRequest(serverUrl + "/projects", params, function(response) {
-        jsonResponse = JSON.parse(response.response);
+        var jsonResponse = JSON.parse(response.response);
         if ((response.status == 200) || (response.status == 201)) {
           console.log("Project POSTed");
           sessionStorage.removeItem("project");
@@ -2090,41 +2092,49 @@ tbody.collapse.show {
       scoreboardDiv.appendChild(scoreboardTable);
       console.log("Table created");
 
-      wait_for_stored_element("project");
-      var project = JSON.parse(sessionStorage.getItem("project"));
-      console.log("el proyecto es:");
-      console.log(project);
-
-      //set_up_scoreboard(project, scoreboardDiv, scoreboardTable)
-
       //Tengo que traerme los datos del proyecto actual (o sea, levantar el id a partir de lo anterior). A partir de esto, agarrar el colaborador actual de la lista de colaboradores del proyecto, y armar el coso de info de abajo
-      is_user_site_logged_in();
-      user_site_logged_in = sessionStorage.getItem("user_site_logged_in");
-      if (user_site_logged_in == "true") {
-        if (user_gz_logged_in()) {
-          var loggedUser = JSON.parse(sessionStorage.getItem("user_data"));
 
-          console.log("el usuario logueado es:");
-          console.log(loggedUser);
+      wait_for_stored_element("project", function() {
+        var project = JSON.parse(sessionStorage.getItem("project"));
+        var user_site_is_logged_in = function(project) {
+          if (user_gz_logged_in()) {
+            var loggedUser = JSON.parse(sessionStorage.getItem("user_data"));
 
-          if (userIsCollaborator(project, loggedUser)) {
-            console.log("Por agregar el coso de contribution");
-            addContributionDiv(project, loggedUser);
-            console.log("Por llenar la tabla centrada en el usuario");
+            console.log("el usuario logueado es:");
+            console.log(loggedUser);
+
+            if (userIsCollaborator(project, loggedUser)) {
+              console.log("Por agregar el coso de contribution");
+              addContributionDiv(project, loggedUser);
+              console.log("Por llenar la tabla centrada en el usuario");
+            }
+            else {
+              console.log("User no es colaborador, pedir que se una o algo");
+              askToJoin();
+            }
           }
           else {
-            console.log("User no es colaborador, pedir que se una o algo");
-            askToJoin();
-          }
+            console.log("No está logueado en GZ");
+            ask_log_in_gz();
+          }        
         }
-        else {
-          console.log("No está logueado en GZ");
-          ask_log_in_gz();
+
+        var user_site_isnt_logged_in = function() {
+          console.log("No está logueado en Zooniverse");
+          ask_log_in_zoo();        
         }
-      } else {
-        console.log("No está logueado en Zooniverse");
-        ask_log_in_zoo();
-      }
+        console.log("el proyecto es:");
+        console.log(project);
+        set_up_scoreboard(project, scoreboardDiv, scoreboardTable)
+        is_user_site_logged_in(user_site_is_logged_in, user_site_isnt_logged_in);
+      });      
+
+      //user_site_logged_in = sessionStorage.getItem("user_site_logged_in");
+      //if (user_site_logged_in == "true") {
+
+      //} else {
+
+      //}
     }
 
   }
@@ -2282,7 +2292,7 @@ tbody.collapse.show {
 
       var params = JSON.stringify({"user": userData});
       doPostRequest(serverUrl + "/login", params, function(response) {
-        jsonResponse = JSON.parse(response.response);
+        var jsonResponse = JSON.parse(response.response);
         if (response.status == 200) {
           console.log("User logged in");
           var user_id = jsonResponse["user"]["id"];
@@ -2399,7 +2409,7 @@ tbody.collapse.show {
 
       var params = JSON.stringify({"user": userData});
       doPostRequest(serverUrl + "/register", params, function(response) {
-        jsonResponse = JSON.parse(response.response)
+        var jsonResponse = JSON.parse(response.response)
         if (response.status == 200) {
          //Cerrar el modal, y toda la bola en el DOM para mostrar las cosas de usuario logueado
           console.log("User successfully registered");
@@ -2565,28 +2575,35 @@ tbody.collapse.show {
     return true;
   }
 
-  function is_user_site_logged_in() {
-    wait_for_element_expire("button.modal-form-trigger.site-nav__modal.secret-button", 5000, function() {
+  function is_user_site_logged_in(on_true, on_false) {
+    wait_for_element_expire("button.modal-form-trigger.site-nav__modal.secret-button", 2500, function() {
       if (document.querySelector("button.modal-form-trigger.site-nav__modal.secret-button") != undefined) {
-        sessionStorage.removeItem("user_site_logged_in");
-        sessionStorage.setItem("user_site_logged_in", true)
+        on_true();
       }
       else {
-        sessionStorage.removeItem("user_site_logged_in");
-        sessionStorage.setItem("user_site_logged_in", false)
+        on_false();
       }
     });
   }
 
   function user_site_username() {
-    is_user_site_logged_in();
-    user_site_logged_in = sessionStorage.getItem("user_site_logged_in");
-    if (user_site_logged_in == "true") {
-      return (document.getElementsByClassName('modal-form-trigger site-nav__modal secret-button')[0].children[0].children[0].textContent);
+    var user_site_is_logged_in = function() {
+      var site_username = document.getElementsByClassName('modal-form-trigger site-nav__modal secret-button')[0].children[0].children[0].textContent;
+      sessionStorage.setItem("site_username", site_username)
+      return site_username;
     }
-    else {
-      return "";
+
+    var user_site_isnt_logged_in = function() {
+      sessionStorage.setItem("site_username", "")
+      return site_username;
     }
+
+    is_user_site_logged_in(user_site_is_logged_in, user_site_isnt_logged_in);
+    //user_site_logged_in = sessionStorage.getItem("user_site_logged_in");
+    //if (user_site_logged_in == "true") {
+    //}
+    //else {
+    //}
   }
 
   function current_project_name() {
@@ -2601,7 +2618,7 @@ tbody.collapse.show {
 
   function user_not_joined() {
     doGetRequest(serverUrl+"/projects", function(response) {
-      jsonResponse = JSON.parse(response.response);
+      var jsonResponse = JSON.parse(response.response);
       sessionStorage.setItem("projects", JSON.stringify(jsonResponse));
       var not_found = true;
       console.log("Projects:");
@@ -2638,10 +2655,10 @@ tbody.collapse.show {
   }
 
   function accounts_not_linked() {
-    user_id = sessionStorage.getItem("user_id");
+    var user_id = sessionStorage.getItem("user_id");
     //Acá podría usar el token
     doGetRequest(serverUrl + "/users/"+user_id+"/sites_usernames", function(response) {
-      jsonResponse = JSON.parse(response.response);
+      var jsonResponse = JSON.parse(response.response);
       console.log("are accounts linked?");
       console.log(jsonResponse);
       if ((jsonResponse["sites_usernames"] == undefined) || (jsonResponse["sites_usernames"][site_url()] == undefined) || !((jsonResponse["sites_usernames"][site_url()]).includes(user_site_username()))) {
@@ -2677,9 +2694,7 @@ tbody.collapse.show {
 
           gZooModal.appendChild(loggedRow);
           //Lo siguiente, si está logueado en Zooniverse y si las cuentas no están linkeadas
-          is_user_site_logged_in();
-          user_site_logged_in = sessionStorage.getItem("user_site_logged_in");
-          if (user_site_logged_in == "true") {
+          var user_site_is_logged_in = function(gZooModal) {
             console.log("User logged in in Zooniverse");
             accounts_not_linked();
             var linked = sessionStorage.getItem("linked");
@@ -2695,11 +2710,11 @@ tbody.collapse.show {
               connectButton.textContent = "Vincular cuentas";
 
               connectButton.addEventListener("click", function() {
-                user_id = sessionStorage.getItem("user_id");
-                params = JSON.stringify({"site": site_url(), "username": user_site_username()});
+                var user_id = sessionStorage.getItem("user_id");
+                var params = JSON.stringify({"site": site_url(), "username": user_site_username()});
 
                 doPostRequest(serverUrl+"/users/"+user_id+"/site_username", params, function(response) {
-                  jsonResponse = JSON.parse(response.response);
+                  var jsonResponse = JSON.parse(response.response);
                   console.log(jsonResponse);
                   if (response.status == 201) {
                     //location.reload();
@@ -2727,10 +2742,10 @@ tbody.collapse.show {
               gZooModal.appendChild(profileDiv);
 
               //<div class="container" style="border-style: dotted;min-height: 100px;"></div>
-            }
+            }            
           }
-          else {
-            //Por favor ingrese sesión en Zooniverse
+
+          var user_site_isnt_logged_in = function(gZooModal) {
             var askLoginRow = document.createElement('div');
             askLoginRow.className = "row";
             var askLoginDiv = document.createElement('div');
@@ -2741,8 +2756,18 @@ tbody.collapse.show {
             askLoginDiv.appendChild(askLoginP);
             askLoginRow.appendChild(askLoginDiv);
 
-            gZooModal.appendChild(askLoginRow);
+            gZooModal.appendChild(askLoginRow);            
           }
+
+          is_user_site_logged_in(user_site_is_logged_in, user_site_isnt_logged_in);
+          //user_site_logged_in = sessionStorage.getItem("user_site_logged_in");
+          //if (user_site_logged_in == "true") {
+
+          //}
+          //else {
+            //Por favor ingrese sesión en Zooniverse
+
+          //}
 
           var logoutRow = document.createElement('div');
           logoutRow.className = "row";
