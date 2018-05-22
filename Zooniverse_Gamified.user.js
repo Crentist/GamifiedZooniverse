@@ -20,9 +20,20 @@
 
   window.onload = function() {
     console.log("Window loaded. About to execute script");
-    add_click_events();
+    //add_click_events();
+    loadBootstrap();
     executeScript();
   }
+
+  var currentHref = window.location.href;
+
+  var awaiting = setInterval(function() {
+    if (currentHref != window.location.href) {
+      currentHref = window.location.href;
+      console.log("Cambió el href");
+      do_stuff();
+    }
+  }, 100);
 
   var modalStyle = `
                   .modal {
@@ -1490,6 +1501,18 @@ tbody.collapse.show {
     return (window.location.href.indexOf('classify') > -1);
   }
 
+  function project_landing_page() {
+    return /^https:\/\/www\.zooniverse\.org\/projects\/.+\/.+$/.test(window.location.href);
+  }
+
+  function index_page() {
+    return (window.location.href == "https://www.zooniverse.org/");
+  }
+
+  function site_url() {
+    return window.location.host
+  }
+
   function userIsCollaborator(project, loggedUser) {
     if (project.collaborators != undefined) {
       return ((project.collaborators.find(collaborator => collaborator.handle === loggedUser.handle)) != undefined);
@@ -1744,12 +1767,378 @@ tbody.collapse.show {
         classify_page_events(element, project, loggedUser);
       }
 
-      if (event.target.closest("a") != undefined) {
-        console.log(event.target.closest("a"));
-        currentHref = event.target.closest("a").href;
-        location.href = currentHref;
-      }
+      // if (event.target.closest("a") != undefined) {
+      //   console.log(event.target.closest("a"));
+      //   currentHref = event.target.closest("a").href;
+      //   location.href = currentHref;
+      // }
     });
+  }
+
+  function landing_page_stuff() {
+    console.log("In a project's landing page");
+    user_not_joined();
+    var not_joined = sessionStorage.getItem("user_not_joined");
+    if ((user_gz_logged_in()) && (not_joined == "true")) {
+      console.log("User logged in and not joined");
+      wait_for_element("project-home-page__call-to-action", function() {
+        var buttonsDiv = document.querySelector(".project-home-page__call-to-action");
+        var joinButton = document.createElement("button");
+        joinButton.textContent = "Unirse al proyecto en GZoo";
+
+        joinButton.addEventListener("click", function() {
+          current_project_name();
+          var current_project = sessionStorage.getItem("current_project_name");
+          params = JSON.stringify({"project": current_project, "site": "zooniverse.org"});
+          var user_id = sessionStorage.getItem("user_id");
+          doPostRequest(serverUrl+"/users/"+user_id+"/join_project", params, function(response) {
+            location.reload(); //O algo que no necesariamente recargue todo
+          });
+        });
+
+        buttonsDiv.appendChild(joinButton);
+        console.log("Attached Join button");
+      });
+    }
+    else {
+      if (!(user_gz_logged_in())) {
+        console.log("Please log in.")
+        wait_for_element("project-home-page__call-to-action", function() {
+          var buttonsDiv = document.querySelector(".project-home-page__call-to-action");
+          var joinButton = document.createElement("button");
+          joinButton.disabled = true;
+          joinButton.textContent = "Ingrese sesión en GZoo";
+          buttonsDiv.appendChild(joinButton);
+          console.log("Attached Join button");
+        });
+      }
+      else {
+        console.log("Joined.")
+        wait_for_element("project-home-page__call-to-action", function() {
+          var buttonsDiv = document.querySelector(".project-home-page__call-to-action");
+          var joinButton = document.createElement("button");
+          joinButton.disabled = true;
+          joinButton.textContent = "Unido!";
+          buttonsDiv.appendChild(joinButton);
+          console.log("Attached Join button");
+        });
+      }
+    }
+  }
+
+  function classify_page_stuff() {
+    console.log("In a project's classification page");
+    var awaiting = setInterval(function() { //Se podrá hacer con Promise?
+      var classifierElement = document.querySelector('.classifier');
+      if (classifierElement != undefined) {
+        clearInterval(awaiting);
+        gameOn();
+      }
+    }, 100);
+
+    function gameOn() {
+      function addContributionDiv(project, loggedUser) { //Como parámetro, el elemento html donde se quiera insertar el div de contribución
+        var contributionDiv = document.createElement('div');
+        contributionDiv.id = 'contributionDiv';
+        var contributionHeaderDiv = document.createElement('div');
+        contributionHeaderDiv.id = 'contributionHeaderDiv';
+        contributionHeaderDiv.style.textAlign = 'center';
+        contributionHeaderDiv.style.padding = '5px 5px 5px 5px';
+        var strongTitleTextHolder = document.createElement('strong');
+        strongTitleTextHolder.appendChild(document.createTextNode('Mi contribución en ' + project.name));
+        contributionHeaderDiv.appendChild(strongTitleTextHolder);
+        contributionDiv.appendChild(contributionHeaderDiv);
+
+        var contributionDataDiv = document.createElement('div');
+        contributionDataDiv.id = "contributionDataDiv";
+        var sinceSpan = document.createElement('span');
+        sinceSpan.id = "collaboratingSince";
+        sinceSpan.style.display = 'inline-block';
+        sinceSpan.style.marginRight = '10px';
+
+        doGetRequest(serverUrl + "/users/" + loggedUser.id + "/collaboration/" + project.id, function(response) {
+          console.log("La respuesta de user/collaboration:");
+          console.log(response);
+          jsonResponse = JSON.parse(response.response);
+          console.log("Colaboración del usuario en el proyecto:");
+          console.log(jsonResponse);
+          if (response.status == 200) {
+            sessionStorage.removeItem("user_collaboration");
+            sessionStorage.setItem("user_collaboration", JSON.stringify(jsonResponse));
+          }
+          else {
+            //Alguna especie de error
+          }
+        });
+
+        wait_for_stored_element("user_collaboration");
+
+        console.log("Por parsear user_collaboration:");
+        console.log(sessionStorage.getItem("user_collaboration"));
+        var userCollaboration = JSON.parse(sessionStorage.getItem("user_collaboration"));
+        var firstContributionDate = userCollaboration.created_at;
+
+        sinceSpan.innerHTML = 'Colaborando desde el <strong>' + firstContributionDate + '</strong>';
+
+        var lastContributionSpan = document.createElement('span');
+        lastContributionSpan.id = "lastContributionDate";
+        lastContributionSpan.style.float = 'right';
+        lastContributionSpan.style.display = 'inline-block';
+        var lastContributionDateTime = userCollaboration.updated_at;
+        lastContributionSpan.innerHTML = 'Última contribución el <strong> '+ lastContributionDateTime +' </strong>';
+
+        contributionDataDiv.appendChild(sinceSpan);
+        contributionDataDiv.appendChild(lastContributionSpan);
+        contributionDataDiv.appendChild(document.createElement('br'));
+        contributionDataDiv.appendChild(document.createElement('br'));
+
+        var classificationsDiv = document.createElement('div');
+        classificationsDiv.id = "classificationsDiv";
+        classificationsDiv.style.width = '50%';
+        classificationsDiv.style.textAlign = 'center';
+        classificationsDiv.style.display = 'inline-block';
+        var classificationsSpan = document.createElement('span');
+        classificationsSpan.innerHTML = 'Clasificaciones';
+        classificationsDiv.appendChild(classificationsSpan);
+        classificationsDiv.appendChild(document.createElement('br'));
+        var classificationCountSpan = document.createElement('span');
+        var userClassificationCount = userCollaboration.classification_count; //placeholder
+        classificationCountSpan.innerHTML = '<strong>' + userClassificationCount + '</strong>';
+        classificationsDiv.appendChild(classificationCountSpan);
+        classificationsDiv.appendChild(document.createElement('br'));
+
+        contributionDataDiv.appendChild(classificationsDiv);
+
+        var badgesDiv = document.createElement('div');
+        badgesDiv.id = "badgesDiv";
+        badgesDiv.style.display = 'inline-block';
+        badgesDiv.style.width = '20%';
+        badgesDiv.style.position = 'absolute';
+        badgesDiv.style.textAlign = 'center';
+
+        var badgesStrong = document.createElement('strong');
+        badgesStrong.style.display = 'inline-block';
+        badgesStrong.innerHTML = 'Mis insignias';
+
+        badgesDiv.appendChild(badgesStrong);
+        badgesDiv.appendChild(document.createElement('br'));
+        badgesDiv.appendChild(document.createElement('br'));
+        badgesDiv.appendChild(document.createElement('br'));
+
+        var nextMilestoneSpan = document.createElement('span');
+        var milestoneText = document.createElement('font');
+        milestoneText.size = '1';
+        var milestoneValue = '48'; //Placeholder
+        milestoneText.innerHTML = '';//'Realizá <strong> ' + milestoneValue + ' </strong> clasificaciones más para la siguiente insignia!';
+
+        nextMilestoneSpan.appendChild(milestoneText);
+        badgesDiv.appendChild(nextMilestoneSpan);
+
+        contributionDataDiv.appendChild(badgesDiv);
+
+        var contributionDivContainer = document.createElement('div');
+        contributionDivContainer.style.display = "inline-grid";
+        contributionDivContainer.style.paddingLeft = "20%";
+
+        contributionDivContainer.appendChild(contributionDiv); //El div con lo de mi colaboración
+        contributionDivContainer.appendChild(contributionDataDiv);
+
+        wait_for_element("content-container", function() {
+          sibling_div = document.querySelector(".classifier");
+          sibling_div.parentNode.insertBefore(contributionDivContainer, sibling_div.nextSibling);
+        });
+      }
+
+      function askToJoin() {
+        //Wait for element probablemente
+        contentContainer = document.querySelector(".content-container");
+        unite = document.createElement("div");
+        unite.className = "col-8 offset-5";
+        unite.style.width = "250px";
+        unite.style.height = "80px";
+        texto_unite = document.createElement("p");
+        texto_unite.textContent = "Unite al proyecto para jugar!";
+        var joinButton = document.createElement("button");
+        joinButton.textContent = "Unirse al proyecto en GZoo";
+
+        joinButton.addEventListener("click", function() {
+          current_project_name();
+          var current_project = sessionStorage.getItem("current_project_name");
+          params = JSON.stringify({"project": current_project, "site": "zooniverse.org"});
+          var user_id = sessionStorage.getItem("user_id");
+          doPostRequest(serverUrl+"/users/"+user_id+"/join_project", params, function(response) {
+            location.reload(); //O algo que no necesariamente recargue todo
+          });
+        });
+        unite.appendChild(texto_unite);
+        contentContainer.prepend(unite);
+      }
+
+      function ask_log_in_zoo() {
+        contentContainer = document.querySelector(".content-container");
+        unite = document.createElement("div");
+        unite.className = "col-8 offset-5";
+        unite.style.width = "350px";
+        unite.style.height = "80px";
+        texto_unite = document.createElement("p");
+        texto_unite.textContent = "Logueate en Zooniverse para jugar";
+        unite.appendChild(texto_unite);
+        contentContainer.prepend(unite);
+      }
+
+      function ask_log_in_gz() {
+        //Wait for element probablemente
+        contentContainer = document.querySelector(".content-container");
+        unite = document.createElement("div");
+        unite.className = "col-8 offset-5";
+        unite.style.width = "350px";
+        unite.style.height = "80px";
+        texto_unite = document.createElement("p");
+        texto_unite.textContent = "Logueate en GZoo para jugar";
+        unite.appendChild(texto_unite);
+        contentContainer.prepend(unite);
+
+      }
+
+      function set_up_scoreboard(project, scoreboardDiv, scoreboardTable) {
+        if (!(project == undefined)) { //Mepa que no es necesario, lo dejo por las dudas
+          if ((project.collaborators != undefined) && (project.collaborators.length > 0)) {
+            console.log("La tabla de puntos:");
+            addScoreboard(scoreboardDiv, scoreboardTable, project);
+            var loggedUser = JSON.parse(sessionStorage.getItem("user_data"));
+            var user_id;
+            if (loggedUser == null) {
+              user_id = null;
+            } else {
+              user_id = loggedUser.id;
+            }
+            doGetRequest(serverUrl + "/projects/"+project.id+"/ranking/"+user_id, function(response) {
+            jsonResponse = JSON.parse(response.response);
+              if ((response.status == 200) || (response.status == 201)) {
+                console.log("Project ranking GETed");
+                sessionStorage.removeItem("ranking");;
+                sessionStorage.setItem("ranking", JSON.stringify(jsonResponse))
+              }
+            });
+
+            var ranking = JSON.parse(sessionStorage.getItem("ranking"));
+
+            populateBoard(scoreboardTable, ranking);
+          } else {
+            console.log("Sin colaboradores");
+            scoreboardDiv.style.width = '15%';
+            scoreboardTable.innerHTML = "<center> Aún no hay colaboradores en este proyecto. Sé el primero </center>";
+
+            task_area_container().appendChild(scoreboardDiv);
+            //var taskArea = document.getElementsByClassName('task-area')[0];
+            //taskArea.parentNode.insertBefore(scoreboardDiv, document.getElementsByClassName('task-area')[0].nextSibling);
+          }
+        }
+      }
+
+      var tableStyle = `element {
+                        }
+                        .table > caption + thead > tr:first-child > td, .table > caption + thead > tr:first-child > th, .table > colgroup + thead > tr:first-child > td, .table > colgroup + thead > tr:first-child > th, .table > thead:first-child > tr:first-child > td, .table > thead:first-child > tr:first-child > th {
+                            border-top: 0;
+                        }
+                        .table > thead > tr > th {
+                            vertical-align: bottom;
+                            border-bottom: 2px solid #ddd;
+                        }
+                        .table > tbody > tr > td, .table > tbody > tr > th, .table > tfoot > tr > td, .table > tfoot > tr > th, .table > thead > tr > td, .table > thead > tr > th {
+                            padding: 8px;
+                            line-height: 1.42857143;
+                            vertical-align: top;
+                            border-top: 1px solid #ddd;
+                        }
+                        table {
+                            border-spacing: 0;
+                            border-collapse: collapse;
+                        }`;
+
+      var style = document.createElement("style");
+      style.type = "text/css";
+      style.appendChild(document.createTextNode(tableStyle));
+      document.head.appendChild(style);
+
+      var user = JSON.parse(sessionStorage.getItem("user_data"));
+
+      console.log("Found classify element");
+
+      current_project_name();
+      projectName = sessionStorage.getItem("current_project_name");
+
+      //POSTeo de una. Si ya existe con ese nombre, me lo devuelve
+      params = JSON.stringify({"name": projectName});
+      doPostRequest(serverUrl + "/projects", params, function(response) {
+        jsonResponse = JSON.parse(response.response);
+        if ((response.status == 200) || (response.status == 201)) {
+          console.log("Project POSTed");
+          sessionStorage.removeItem("project");
+          sessionStorage.setItem("project", JSON.stringify(jsonResponse))
+        }
+      });
+
+      var scoreboardDiv = document.createElement('div');
+      scoreboardDiv.id = "scoreboardDiv";
+      scoreboardDiv.style.marginLeft = '1em';
+      scoreboardDiv.style.width = '25%';
+      var scoreboardTable = document.createElement("table");
+      scoreboardTable.className = 'table';
+      scoreboardTable.id = "tablaPuntaje";
+      scoreboardTable.style.margin = "0px auto";
+      scoreboardDiv.appendChild(scoreboardTable);
+      console.log("Table created");
+
+      wait_for_stored_element("project");
+      var project = JSON.parse(sessionStorage.getItem("project"));
+      console.log("el proyecto es:");
+      console.log(project);
+
+      //set_up_scoreboard(project, scoreboardDiv, scoreboardTable)
+
+      //Tengo que traerme los datos del proyecto actual (o sea, levantar el id a partir de lo anterior). A partir de esto, agarrar el colaborador actual de la lista de colaboradores del proyecto, y armar el coso de info de abajo
+      is_user_site_logged_in();
+      user_site_logged_in = sessionStorage.getItem("user_site_logged_in");
+      if (user_site_logged_in == "true") {
+        if (user_gz_logged_in()) {
+          var loggedUser = JSON.parse(sessionStorage.getItem("user_data"));
+
+          console.log("el usuario logueado es:");
+          console.log(loggedUser);
+
+          if (userIsCollaborator(project, loggedUser)) {
+            console.log("Por agregar el coso de contribution");
+            addContributionDiv(project, loggedUser);
+            console.log("Por llenar la tabla centrada en el usuario");
+          }
+          else {
+            console.log("User no es colaborador, pedir que se una o algo");
+            askToJoin();
+          }
+        }
+        else {
+          console.log("No está logueado en GZ");
+          ask_log_in_gz();
+        }
+      } else {
+        console.log("No está logueado en Zooniverse");
+        ask_log_in_zoo();
+      }
+    }
+
+  }
+
+  function do_stuff() {
+    wait_for_element("site-nav", function() {
+      gzoo_account_bar_stuff();
+    });
+    if (project_landing_page()) {
+      landing_page_stuff();
+    }
+    if (classify_page()) {
+      classify_page_stuff();
+    }
   }
 
   function doDeleteRequest(url, callback) {
@@ -1765,11 +2154,14 @@ tbody.collapse.show {
   }
 
   function loadBootstrap() {
-    var link = document.createElement("link");
-    link.href = "https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap-grid.min.css";
-    link.rel="stylesheet";
-    link.type="text/css";
-    document.head.appendChild(link);
+    if (document.querySelector("#gzoo_bootstrap") == undefined) {
+      var link = document.createElement("link");
+      link.href = "https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap-grid.min.css";
+      link.rel="stylesheet";
+      link.type="text/css";
+      link.id = "gzoo_bootstrap";
+      document.head.appendChild(link);
+    }
   }
 
   function addStyle(css) {
@@ -1780,22 +2172,6 @@ tbody.collapse.show {
       style.appendChild(document.createTextNode(css));
       head.appendChild(style);
     }
-  }
-
-  function sleep(ms) {
-    console.log("esperar por "+ms+" ms");
-    var i = 0;
-    var awaiting = setInterval(function() { //Se podrá hacer con Promise?
-      if (i == 1) {
-        console.log("limpie");
-        clearInterval(awaiting);
-      }
-      else {
-        i++;
-        console.log("Esperando");
-        console.log(i);
-      }
-    }, ms);
   }
 
   function wait_for_element(className, action) {
@@ -1810,11 +2186,12 @@ tbody.collapse.show {
     }, 100);
   }
 
-  function wait_for_stored_element(element) {
+  function wait_for_stored_element(element, action) {
     var awaiting = setInterval(function() { //Se podrá hacer con Promise?
       if (sessionStorage.getItem(element)) {
         clearInterval(awaiting);
         console.log("stored element loaded");
+        action();
       }
     }, 100);
   }
@@ -1928,6 +2305,7 @@ tbody.collapse.show {
         else {
           //Mirar los errores y cambiar los campos
           //jsonResponseErrors.each
+          console.log("LOS ERRORES DEL LOGIN:");
           console.log(jsonResponse["errors"]);
           //Un iterador con un case/switch ???
         }
@@ -2160,6 +2538,8 @@ tbody.collapse.show {
 
     console.log("Events attached");
 
+
+    //Asumo que van a estar porque se ejecuta luego del load del window
     if (!(document.querySelector(".account-bar") == undefined)) {
       document.querySelector(".account-bar").prepend(gZooButton);
       console.log("Attached GZoo thingy into the account bar");
@@ -2171,22 +2551,10 @@ tbody.collapse.show {
       }
     }
 
-    wait_for_element("account-bar", function() {
-      document.querySelector(".account-bar").prepend(gZooButton);
-      console.log("Attached GZoo thingy into the thing");
-    });
-  }
-
-  function project_landing_page() {
-    return /^https:\/\/www\.zooniverse\.org\/projects\/.+\/.+$/.test(window.location.href);
-  }
-
-  function index_page() {
-    return (window.location.href == "https://www.zooniverse.org/");
-  }
-
-  function site_url() {
-    return window.location.host
+    //wait_for_element("account-bar", function() {
+    //  document.querySelector(".account-bar").prepend(gZooButton);
+    //  console.log("Attached GZoo thingy into the thing");
+    //});
   }
 
   function user_gz_logged_in() {
@@ -2210,7 +2578,6 @@ tbody.collapse.show {
     });
   }
 
-
   function user_site_username() {
     is_user_site_logged_in();
     user_site_logged_in = sessionStorage.getItem("user_site_logged_in");
@@ -2221,7 +2588,6 @@ tbody.collapse.show {
       return "";
     }
   }
-
 
   function current_project_name() {
     wait_for_tag_element("h1", function() {
@@ -2287,19 +2653,7 @@ tbody.collapse.show {
     });
   }
 
-  function executeScript() {
-    if (document.readyState != "complete") {
-      location.reload();
-    }
-    loadBootstrap();
-    console.log("Welcome to Zooniverse Gamified!");
-
-    console.log("EXECUTE SCRIPT. Los valores guardados son:");
-    console.log(sessionStorage.getItem("user_id"));
-    console.log(sessionStorage.getItem("user_token"));
-    console.log(sessionStorage.getItem("user_handle"));
-
-    //En el navbar
+  function gzoo_account_bar_stuff() {
     if (document.getElementById("gZooAccount") == undefined) {
       console.log("GZoo navbar button is not defined");
       addStyle(modalStyle);
@@ -2421,6 +2775,21 @@ tbody.collapse.show {
         });
       }
     }
+  }
+
+  function executeScript() {
+    //if (document.readyState != "complete") {
+    //  location.reload();
+    //}
+    console.log("Welcome to Zooniverse Gamified!");
+
+    console.log("EXECUTE SCRIPT. Los valores guardados son:");
+    console.log(sessionStorage.getItem("user_id"));
+    console.log(sessionStorage.getItem("user_token"));
+    console.log(sessionStorage.getItem("user_handle"));
+
+    //En el navbar
+    gzoo_account_bar_stuff();
 
     //En la página de inicio
 
@@ -2450,343 +2819,11 @@ tbody.collapse.show {
     //En la pantalla principal del proyecto
 
     if (project_landing_page()) {
-      console.log("In a project's landing page");
-      user_not_joined();
-      var not_joined = sessionStorage.getItem("user_not_joined");
-      if ((user_gz_logged_in()) && (not_joined == "true")) {
-        console.log("User logged in and not joined");
-        wait_for_element("project-home-page__call-to-action", function() {
-          var buttonsDiv = document.querySelector(".project-home-page__call-to-action");
-          var joinButton = document.createElement("button");
-          joinButton.textContent = "Unirse al proyecto en GZoo";
-
-          joinButton.addEventListener("click", function() {
-            current_project_name();
-            var current_project = sessionStorage.getItem("current_project_name");
-            params = JSON.stringify({"project": current_project, "site": "zooniverse.org"});
-            var user_id = sessionStorage.getItem("user_id");
-            doPostRequest(serverUrl+"/users/"+user_id+"/join_project", params, function(response) {
-              // >>>>>>>> CONTINUE HERE
-              location.reload(); //O algo que no necesariamente recargue todo
-            });
-          });
-
-          buttonsDiv.appendChild(joinButton);
-          console.log("Attached Join button");
-        });
-      }
-      else {
-        if (!(user_gz_logged_in())) {
-          console.log("Please log in.")
-          wait_for_element("project-home-page__call-to-action", function() {
-            var buttonsDiv = document.querySelector(".project-home-page__call-to-action");
-            var joinButton = document.createElement("button");
-            joinButton.disabled = true;
-            joinButton.textContent = "Ingrese sesión en GZoo";
-            buttonsDiv.appendChild(joinButton);
-            console.log("Attached Join button");
-          });
-        }
-        else {
-          console.log("Joined.")
-          wait_for_element("project-home-page__call-to-action", function() {
-            var buttonsDiv = document.querySelector(".project-home-page__call-to-action");
-            var joinButton = document.createElement("button");
-            joinButton.disabled = true;
-            joinButton.textContent = "Unido!";
-            buttonsDiv.appendChild(joinButton);
-            console.log("Attached Join button");
-          });
-        }
-      }
+      landing_page_stuff();
     }
 
     //En la clasificación de un proyecto. Funcionalidad específica para esa pantalla
     if (classify_page()) {
-      console.log("In a project's classification page");
-      var awaiting = setInterval(function() { //Se podrá hacer con Promise?
-        var classifierElement = document.querySelector('.classifier');
-        if (classifierElement != undefined) {
-          clearInterval(awaiting);
-          gameOn();
-        }
-      }, 100);
-
-      function gameOn() {
-        function addContributionDiv(project, loggedUser) { //Como parámetro, el elemento html donde se quiera insertar el div de contribución
-          var contributionDiv = document.createElement('div');
-          contributionDiv.id = 'contributionDiv';
-          var contributionHeaderDiv = document.createElement('div');
-          contributionHeaderDiv.id = 'contributionHeaderDiv';
-          contributionHeaderDiv.style.textAlign = 'center';
-          contributionHeaderDiv.style.padding = '5px 5px 5px 5px';
-          var strongTitleTextHolder = document.createElement('strong');
-          strongTitleTextHolder.appendChild(document.createTextNode('Mi contribución en ' + project.name));
-          contributionHeaderDiv.appendChild(strongTitleTextHolder);
-          contributionDiv.appendChild(contributionHeaderDiv);
-
-          var contributionDataDiv = document.createElement('div');
-          contributionDataDiv.id = "contributionDataDiv";
-          var sinceSpan = document.createElement('span');
-          sinceSpan.id = "collaboratingSince";
-          sinceSpan.style.display = 'inline-block';
-          sinceSpan.style.marginRight = '10px';
-
-          doGetRequest(serverUrl + "/users/" + loggedUser.id + "/collaboration/" + project.id, function(response) {
-            console.log("La respuesta de user/collaboration:");
-            console.log(response);
-            jsonResponse = JSON.parse(response.response);
-            console.log("Colaboración del usuario en el proyecto:");
-            console.log(jsonResponse);
-            if (response.status == 200) {
-              sessionStorage.removeItem("user_collaboration");
-              sessionStorage.setItem("user_collaboration", JSON.stringify(jsonResponse));
-            }
-            else {
-              //Alguna especie de error
-            }
-          });
-
-          wait_for_stored_element("user_collaboration");
-
-          console.log("Por parsear user_collaboration:");
-          console.log(sessionStorage.getItem("user_collaboration"));
-          var userCollaboration = JSON.parse(sessionStorage.getItem("user_collaboration"));
-          var firstContributionDate = userCollaboration.created_at;
-          // '01/01/1900'; //placeholder. created_at es la primera; updated_at es la última
-
-          sinceSpan.innerHTML = 'Colaborando desde el <strong>' + firstContributionDate + '</strong>';
-
-          var lastContributionSpan = document.createElement('span');
-          lastContributionSpan.id = "lastContributionDate";
-          lastContributionSpan.style.float = 'right';
-          lastContributionSpan.style.display = 'inline-block';
-          var lastContributionDateTime = userCollaboration.updated_at;
-          lastContributionSpan.innerHTML = 'Última contribución el <strong> '+ lastContributionDateTime +' </strong>';
-
-          contributionDataDiv.appendChild(sinceSpan);
-          contributionDataDiv.appendChild(lastContributionSpan);
-          contributionDataDiv.appendChild(document.createElement('br'));
-          contributionDataDiv.appendChild(document.createElement('br'));
-
-          var classificationsDiv = document.createElement('div');
-          classificationsDiv.id = "classificationsDiv";
-          classificationsDiv.style.width = '50%';
-          classificationsDiv.style.textAlign = 'center';
-          classificationsDiv.style.display = 'inline-block';
-          var classificationsSpan = document.createElement('span');
-          classificationsSpan.innerHTML = 'Clasificaciones';
-          classificationsDiv.appendChild(classificationsSpan);
-          classificationsDiv.appendChild(document.createElement('br'));
-          var classificationCountSpan = document.createElement('span');
-          var userClassificationCount = userCollaboration.classification_count; //placeholder
-          classificationCountSpan.innerHTML = '<strong>' + userClassificationCount + '</strong>';
-          classificationsDiv.appendChild(classificationCountSpan);
-          classificationsDiv.appendChild(document.createElement('br'));
-
-          contributionDataDiv.appendChild(classificationsDiv);
-
-          var badgesDiv = document.createElement('div');
-          badgesDiv.id = "badgesDiv";
-          badgesDiv.style.display = 'inline-block';
-          badgesDiv.style.width = '20%';
-          badgesDiv.style.position = 'absolute';
-          badgesDiv.style.textAlign = 'center';
-
-          var badgesStrong = document.createElement('strong');
-          badgesStrong.style.display = 'inline-block';
-          badgesStrong.innerHTML = 'Mis insignias';
-
-          badgesDiv.appendChild(badgesStrong);
-          badgesDiv.appendChild(document.createElement('br'));
-          badgesDiv.appendChild(document.createElement('br'));
-          badgesDiv.appendChild(document.createElement('br'));
-
-          var nextMilestoneSpan = document.createElement('span');
-          var milestoneText = document.createElement('font');
-          milestoneText.size = '1';
-          var milestoneValue = '48'; //Placeholder
-          milestoneText.innerHTML = '';//'Realizá <strong> ' + milestoneValue + ' </strong> clasificaciones más para la siguiente insignia!';
-
-          nextMilestoneSpan.appendChild(milestoneText);
-          badgesDiv.appendChild(nextMilestoneSpan);
-
-          contributionDataDiv.appendChild(badgesDiv);
-
-          var contributionDivContainer = document.createElement('div');
-          contributionDivContainer.style.display = "inline-grid";
-          contributionDivContainer.style.paddingLeft = "20%";
-
-          contributionDivContainer.appendChild(contributionDiv); //El div con lo de mi colaboración
-          contributionDivContainer.appendChild(contributionDataDiv);
-
-
-          wait_for_element("content-container", function() {
-            var taskContainerDiv = document.querySelector(".content-container").children[0];
-            sibling_div = document.querySelector(".classifier");
-            sibling_div.parentNode.insertBefore(contributionDivContainer, sibling_div.nextSibling);
-            //taskContainerDiv.appendChild(contributionDivContainer);
-          });
-
-        }
-
-        function askToJoin() {
-          //Wait for element probablemente
-          contentContainer = document.querySelector(".content-container");
-          unite = document.createElement("div");
-          unite.className = "col-8 offset-5";
-          unite.style.width = "250px";
-          unite.style.height = "80px";
-          texto_unite = document.createElement("p");
-          texto_unite.textContent = "Unite al proyecto para jugar!";
-          var joinButton = document.createElement("button");
-          joinButton.textContent = "Unirse al proyecto en GZoo";
-
-          joinButton.addEventListener("click", function() {
-            current_project_name();
-            var current_project = sessionStorage.getItem("current_project_name");
-            params = JSON.stringify({"project": current_project, "site": "zooniverse.org"});
-            var user_id = sessionStorage.getItem("user_id");
-            doPostRequest(serverUrl+"/users/"+user_id+"/join_project", params, function(response) {
-              // >>>>>>>> CONTINUE HERE
-              location.reload(); //O algo que no necesariamente recargue todo
-            });
-          });
-          unite.appendChild(texto_unite);
-          contentContainer.prepend(unite);
-        }
-
-        function ask_log_in_gz() {
-          //Wait for element probablemente
-          contentContainer = document.querySelector(".content-container");
-          unite = document.createElement("div");
-          unite.className = "col-8 offset-5";
-          unite.style.width = "250px";
-          unite.style.height = "80px";
-          texto_unite = document.createElement("p");
-          texto_unite.textContent = "Logueate en GZoo para jugar";
-          unite.appendChild(texto_unite);
-          contentContainer.prepend(unite);
-
-        }
-
-        var tableStyle = `element {
-                          }
-                          .table > caption + thead > tr:first-child > td, .table > caption + thead > tr:first-child > th, .table > colgroup + thead > tr:first-child > td, .table > colgroup + thead > tr:first-child > th, .table > thead:first-child > tr:first-child > td, .table > thead:first-child > tr:first-child > th {
-                              border-top: 0;
-                          }
-                          .table > thead > tr > th {
-                              vertical-align: bottom;
-                              border-bottom: 2px solid #ddd;
-                          }
-                          .table > tbody > tr > td, .table > tbody > tr > th, .table > tfoot > tr > td, .table > tfoot > tr > th, .table > thead > tr > td, .table > thead > tr > th {
-                              padding: 8px;
-                              line-height: 1.42857143;
-                              vertical-align: top;
-                              border-top: 1px solid #ddd;
-                          }
-                          table {
-                              border-spacing: 0;
-                              border-collapse: collapse;
-                          }`;
-
-        var style = document.createElement("style");
-        style.type = "text/css";
-        style.appendChild(document.createTextNode(tableStyle));
-        document.head.appendChild(style);
-
-        var user = JSON.parse(sessionStorage.getItem("user_data"));
-
-        console.log("Found classify element");
-
-        current_project_name();
-        projectName = sessionStorage.getItem("current_project_name");
-
-        //POSTeo de una. Si ya existe con ese nombre, me lo devuelve
-        params = JSON.stringify({"name": projectName});
-        doPostRequest(serverUrl + "/projects", params, function(response) {
-          jsonResponse = JSON.parse(response.response);
-          if ((response.status == 200) || (response.status == 201)) {
-            console.log("Project POSTed");
-            sessionStorage.removeItem("project");;
-            sessionStorage.setItem("project", JSON.stringify(jsonResponse))
-          }
-        });
-
-        var scoreboardDiv = document.createElement('div');
-        scoreboardDiv.id = "scoreboardDiv";
-        scoreboardDiv.style.marginLeft = '1em';
-        scoreboardDiv.style.width = '25%';
-        var scoreboardTable = document.createElement("table");
-        scoreboardTable.className = 'table';
-        scoreboardTable.id = "tablaPuntaje";
-        scoreboardTable.style.margin = "0px auto";
-        scoreboardDiv.appendChild(scoreboardTable);
-        console.log("Table created");
-
-        wait_for_stored_element("project");
-        var project = JSON.parse(sessionStorage.getItem("project"));
-        console.log("el proyecto es:");
-        console.log(project);
-
-        if (!(project == undefined)) {
-          if (project.collaborators != undefined) {
-            console.log("La tabla de puntos:");
-            addScoreboard(scoreboardDiv, scoreboardTable, project);
-            var loggedUser = JSON.parse(sessionStorage.getItem("user_data"));
-            var user_id;
-            if (loggedUser == null) {
-              user_id = null;
-            } else {
-              user_id = loggedUser.id;
-            }
-            doGetRequest(serverUrl + "/projects/"+project.id+"/ranking/"+user_id, function(response) {
-            jsonResponse = JSON.parse(response.response);
-              if ((response.status == 200) || (response.status == 201)) {
-                console.log("Project ranking GETed");
-                sessionStorage.removeItem("ranking");;
-                sessionStorage.setItem("ranking", JSON.stringify(jsonResponse))
-              }
-            });
-
-            var ranking = JSON.parse(sessionStorage.getItem("ranking"));
-
-            populateBoard(scoreboardTable, ranking);
-          } else {
-            console.log("Sin colaboradores");
-            scoreboardTable.innerHTML = "<center> Aún no hay colaboradores en este proyecto. Sé el primero </center>";
-            var taskArea = document.getElementsByClassName('task-area')[0];
-            taskArea.parentNode.insertBefore(scoreboardDiv, document.getElementsByClassName('task-area')[0].nextSibling);
-          }
-        }
-
-        //Tengo que traerme los datos del proyecto actual (o sea, levantar el id a partir de lo anterior). A partir de esto, agarrar el colaborador actual de la lista de colaboradores del proyecto, y armar el coso de info de abajo
-        is_user_site_logged_in();
-        user_site_logged_in = sessionStorage.getItem("user_site_logged_in");
-        if (user_site_logged_in) {
-          if (user_gz_logged_in()) {
-            var loggedUser = JSON.parse(sessionStorage.getItem("user_data"));
-
-            console.log("el usuario logueado es:");
-            console.log(loggedUser);
-
-            if (userIsCollaborator(project, loggedUser)) {
-              console.log("Por agregar el coso de contribution");
-              addContributionDiv(project, loggedUser);
-              console.log("Por llenar la tabla centrada en el usuario");
-            }
-            else {
-              console.log("User no es colaborador, pedir que se una o algo");
-              askToJoin();
-            }
-          }
-          else {
-            console.log("No está logueado en GZ");
-            ask_log_in_gz();
-          }
-        } else {
-          console.log("No está logueado en Zooniverse");
-        }
-      }
+      classify_page_stuff();
     }
   }
