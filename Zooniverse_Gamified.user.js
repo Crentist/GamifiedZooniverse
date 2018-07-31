@@ -1577,8 +1577,6 @@ tbody.collapse.show {
   function populateBoard(board, ranking) {
     //board es una tabla HTML
     //ranking es un hash con las posiciones
-
-    //console.log("Estamos acá y no sé por qué hace cualquiera");
     //console.log(ranking);
     var loggedUser = JSON.parse(sessionStorage.getItem("user_data"));
 
@@ -1873,7 +1871,7 @@ tbody.collapse.show {
           }
         });
 
-        wait_for_stored_element("user_collaboration");
+        wait_for_stored_element("user_collaboration"); //Actualizar esto!!!
 
         console.log("Por parsear user_collaboration:");
         console.log(sessionStorage.getItem("user_collaboration"));
@@ -2032,8 +2030,6 @@ tbody.collapse.show {
             scoreboardTable.innerHTML = "<center> Aún no hay colaboradores en este proyecto. Sé el primero </center>";
 
             task_area_container().appendChild(scoreboardDiv);
-            //var taskArea = document.getElementsByClassName('task-area')[0];
-            //taskArea.parentNode.insertBefore(scoreboardDiv, document.getElementsByClassName('task-area')[0].nextSibling);
           }
         }
       }
@@ -2096,12 +2092,14 @@ tbody.collapse.show {
 
       wait_for_stored_element("project", function() {
         var project = JSON.parse(sessionStorage.getItem("project"));
-        var user_site_is_logged_in = function(project) {
+        var user_site_is_logged_in = function() {
           if (user_gz_logged_in()) {
             var loggedUser = JSON.parse(sessionStorage.getItem("user_data"));
 
             console.log("el usuario logueado es:");
             console.log(loggedUser);
+            var project = JSON.parse(sessionStorage.getItem("project"));
+            console.log(project);
 
             if (userIsCollaborator(project, loggedUser)) {
               console.log("Por agregar el coso de contribution");
@@ -2116,25 +2114,18 @@ tbody.collapse.show {
           else {
             console.log("No está logueado en GZ");
             ask_log_in_gz();
-          }        
+          }
         }
 
         var user_site_isnt_logged_in = function() {
           console.log("No está logueado en Zooniverse");
-          ask_log_in_zoo();        
+          ask_log_in_zoo();
         }
         console.log("el proyecto es:");
         console.log(project);
         set_up_scoreboard(project, scoreboardDiv, scoreboardTable)
         is_user_site_logged_in(user_site_is_logged_in, user_site_isnt_logged_in);
-      });      
-
-      //user_site_logged_in = sessionStorage.getItem("user_site_logged_in");
-      //if (user_site_logged_in == "true") {
-
-      //} else {
-
-      //}
+      });
     }
 
   }
@@ -2293,6 +2284,8 @@ tbody.collapse.show {
       var params = JSON.stringify({"user": userData});
       doPostRequest(serverUrl + "/login", params, function(response) {
         var jsonResponse = JSON.parse(response.response);
+        console.log("STATUS:");
+        console.log(response.status);
         if (response.status == 200) {
           console.log("User logged in");
           var user_id = jsonResponse["user"]["id"];
@@ -2423,9 +2416,6 @@ tbody.collapse.show {
           sessionStorage.setItem("user_handle", user_handle);
           sessionStorage.setItem("user_data", JSON.stringify(jsonResponse["user"]))
           location.reload();
-          //var modal = document.getElementById("gZooModalWrapper");
-          //modal.style.display = "none";
-          //Cambiar lo que va en el modal, o poner algo distinto en GZoo
         }
         else {
           //Mirar los errores y cambiar los campos
@@ -2524,6 +2514,8 @@ tbody.collapse.show {
     gZooButton.appendChild(gZooSpan);
     gZooSpan.appendChild(textSpan);
 
+    modalWrapper.appendChild(gZooModal);
+
     callback(gZooModal);
 
     console.log("Stuff created");
@@ -2540,14 +2532,9 @@ tbody.collapse.show {
       modalWrapper.style.display = "none";
     }
 
-    modalWrapper.appendChild(gZooModal);
-
-    //document.getElementsByTagName("body")[0].prepend(modalWrapper);
-
     document.querySelector(".app-layout").prepend(modalWrapper);
 
     console.log("Events attached");
-
 
     //Asumo que van a estar porque se ejecuta luego del load del window
     if (!(document.querySelector(".account-bar") == undefined)) {
@@ -2561,10 +2548,6 @@ tbody.collapse.show {
       }
     }
 
-    //wait_for_element("account-bar", function() {
-    //  document.querySelector(".account-bar").prepend(gZooButton);
-    //  console.log("Attached GZoo thingy into the thing");
-    //});
   }
 
   function user_gz_logged_in() {
@@ -2589,21 +2572,14 @@ tbody.collapse.show {
   function user_site_username() {
     var user_site_is_logged_in = function() {
       var site_username = document.getElementsByClassName('modal-form-trigger site-nav__modal secret-button')[0].children[0].children[0].textContent;
-      sessionStorage.setItem("site_username", site_username)
-      return site_username;
+      sessionStorage.setItem("site_username", site_username);
     }
 
     var user_site_isnt_logged_in = function() {
-      sessionStorage.setItem("site_username", "")
-      return site_username;
+      sessionStorage.setItem("site_username", "");
     }
 
     is_user_site_logged_in(user_site_is_logged_in, user_site_isnt_logged_in);
-    //user_site_logged_in = sessionStorage.getItem("user_site_logged_in");
-    //if (user_site_logged_in == "true") {
-    //}
-    //else {
-    //}
   }
 
   function current_project_name() {
@@ -2661,12 +2637,16 @@ tbody.collapse.show {
       var jsonResponse = JSON.parse(response.response);
       console.log("are accounts linked?");
       console.log(jsonResponse);
-      if ((jsonResponse["sites_usernames"] == undefined) || (jsonResponse["sites_usernames"][site_url()] == undefined) || !((jsonResponse["sites_usernames"][site_url()]).includes(user_site_username()))) {
-        sessionStorage.setItem("linked", false);
-      }
-      else {
-        sessionStorage.setItem("linked", true);
-      }
+      user_site_username();
+      wait_for_stored_element("site_username", function() {
+        var user_site_username = sessionStorage.getItem("site_username");
+        if ((jsonResponse["sites_usernames"] == undefined) || (jsonResponse["sites_usernames"][site_url()] == undefined) || !((jsonResponse["sites_usernames"][site_url()]).includes(user_site_username))) {
+          sessionStorage.setItem("linked", false);
+        }
+        else {
+          sessionStorage.setItem("linked", true);
+        }
+      });
     });
   }
 
@@ -2684,7 +2664,7 @@ tbody.collapse.show {
           var loggedRow = document.createElement('div');
           loggedRow.className = "row";
           var loggedCol = document.createElement('div');
-          loggedCol.className = "col-8 offset-2";
+          loggedCol.className = "col-8";
           var loggedP = document.createElement('p');
           var user_handle = sessionStorage.getItem("user_handle");
           loggedP.textContent = "Logueado como "+user_handle;
@@ -2694,58 +2674,61 @@ tbody.collapse.show {
 
           gZooModal.appendChild(loggedRow);
           //Lo siguiente, si está logueado en Zooniverse y si las cuentas no están linkeadas
-          var user_site_is_logged_in = function(gZooModal) {
+          var user_site_is_logged_in = function() {
             console.log("User logged in in Zooniverse");
             accounts_not_linked();
-            var linked = sessionStorage.getItem("linked");
-            if (linked == "false") {
-              console.log("Accounts are not linked");
-              var connectRow = document.createElement('div');
-              connectRow.className = "row";
-              var connectCol = document.createElement('div');
-              connectCol.className = "col-8 offset-2";
-              var connectP = document.createElement('p');
-              connectP.textContent = "Las cuentas no están vinculadas";
-              var connectButton = document.createElement('button');
-              connectButton.textContent = "Vincular cuentas";
+            wait_for_stored_element("linked", function() {
+              var linked = sessionStorage.getItem("linked");
+              var gZooModal = document.querySelector("#gZooModal");
+              if (linked == "false") {
+                console.log("Accounts are not linked");
+                var connectRow = document.createElement('div');
+                connectRow.className = "row";
+                var connectCol = document.createElement('div');
+                connectCol.className = "col-8 offset-2";
+                var connectP = document.createElement('p');
+                connectP.textContent = "Las cuentas no están vinculadas";
+                var connectButton = document.createElement('button');
+                connectButton.textContent = "Vincular cuentas";
 
-              connectButton.addEventListener("click", function() {
-                var user_id = sessionStorage.getItem("user_id");
-                var params = JSON.stringify({"site": site_url(), "username": user_site_username()});
+                connectButton.addEventListener("click", function() {
+                  var user_id = sessionStorage.getItem("user_id");
+                  var params = JSON.stringify({"site": site_url(), "username": user_site_username()});
 
-                doPostRequest(serverUrl+"/users/"+user_id+"/site_username", params, function(response) {
-                  var jsonResponse = JSON.parse(response.response);
-                  console.log(jsonResponse);
-                  if (response.status == 201) {
-                    //location.reload();
-                  }
-                  else {
-                    //Alguna especie de error
-                  }
+                  doPostRequest(serverUrl+"/users/"+user_id+"/site_username", params, function(response) {
+                    var jsonResponse = JSON.parse(response.response);
+                    console.log(jsonResponse);
+                    if (response.status == 201) {
+                      //location.reload();
+                    }
+                    else {
+                      //Alguna especie de error
+                    }
+                  });
                 });
-              });
 
-              connectCol.appendChild(connectP);
-              connectCol.appendChild(connectButton);
-              connectRow.appendChild(connectCol);
+                connectCol.appendChild(connectP);
+                connectCol.appendChild(connectButton);
+                connectRow.appendChild(connectCol);
 
-              gZooModal.appendChild(connectRow);
-            }
-            else {
-              console.log("Accounts are linked");
-              //Está logueado y las cuentas están linkeadas
-              var profileDiv = document.createElement("div");
-              profileDiv.id = "profileDiv";
-              profileDiv.className = "container";
-              profileDiv.style.borderStyle = "dotted";
-              profileDiv.style.minHeight = "100px";
-              gZooModal.appendChild(profileDiv);
+                gZooModal.appendChild(connectRow);
+              }
+              else {
+                console.log("Accounts are linked");
+                //Está logueado y las cuentas están linkeadas
+                var profileDiv = document.createElement("div");
+                profileDiv.id = "profileDiv";
+                profileDiv.className = "container";
+                profileDiv.style.borderStyle = "dotted";
+                profileDiv.style.minHeight = "100px";
+                gZooModal.appendChild(profileDiv);
 
-              //<div class="container" style="border-style: dotted;min-height: 100px;"></div>
-            }            
+                //<div class="container" style="border-style: dotted;min-height: 100px;"></div>
+              }
+            });
           }
 
-          var user_site_isnt_logged_in = function(gZooModal) {
+          var user_site_isnt_logged_in = function() {
             var askLoginRow = document.createElement('div');
             askLoginRow.className = "row";
             var askLoginDiv = document.createElement('div');
@@ -2756,24 +2739,17 @@ tbody.collapse.show {
             askLoginDiv.appendChild(askLoginP);
             askLoginRow.appendChild(askLoginDiv);
 
-            gZooModal.appendChild(askLoginRow);            
+            gZooModal = document.querySelector("#gZooModal");
+
+            gZooModal.appendChild(askLoginRow);
           }
 
           is_user_site_logged_in(user_site_is_logged_in, user_site_isnt_logged_in);
-          //user_site_logged_in = sessionStorage.getItem("user_site_logged_in");
-          //if (user_site_logged_in == "true") {
 
-          //}
-          //else {
-            //Por favor ingrese sesión en Zooniverse
-
-          //}
-
-          var logoutRow = document.createElement('div');
-          logoutRow.className = "row";
           var logoutCol = document.createElement('div');
-          logoutCol.className = "col-8 offset-2";
+          logoutCol.className = "col-4";
           var logoutButton = document.createElement('button');
+          logoutButton.style.marginTop = "1em";
           logoutButton.textContent = "Cerrar sesión";
 
           logoutButton.addEventListener("click", function() {
@@ -2784,10 +2760,7 @@ tbody.collapse.show {
           });
 
           logoutCol.appendChild(logoutButton);
-          logoutRow.appendChild(logoutCol);
-
-          gZooModal.appendChild(document.createElement("br"));
-          gZooModal.appendChild(logoutRow);
+          loggedRow.appendChild(logoutCol);
 
           //El botón de GZoo en el navbar tendría que mostrar otras cosas
           //El perfil?
@@ -2803,9 +2776,6 @@ tbody.collapse.show {
   }
 
   function executeScript() {
-    //if (document.readyState != "complete") {
-    //  location.reload();
-    //}
     console.log("Welcome to Zooniverse Gamified!");
 
     console.log("EXECUTE SCRIPT. Los valores guardados son:");
@@ -2825,20 +2795,20 @@ tbody.collapse.show {
       unDiv.className = "col-3 offset-8";
       unDiv.style = "float: right";
       //document.querySelector(".home-page-for-user__content").prepend(unDiv);
-      if (user_gz_logged_in() && user_site_logged_in()) {
+     // if (user_gz_logged_in() && user_site_logged_in()) {
         //Módulo con datos del sitio (Zooniverse)
 
 
         //Lo siguiente pone un div más o menos coherente, mirar luego
-        var unDiv = document.createElement("div");
-        unDiv.id = "userSiteCollaboration";
-        unDiv.className = "col-3 offset-8";
-        unDiv.style = "float: right";
-        document.querySelector(".home-page-for-user__content").prepend(unDiv);
-      }
-      else {
+      //  var unDiv = document.createElement("div");
+      //  unDiv.id = "userSiteCollaboration";
+     //   unDiv.className = "col-3 offset-8";
+      //  unDiv.style = "float: right";
+      //  document.querySelector(".home-page-for-user__content").prepend(unDiv);
+      //}
+      //else {
         //Nada. O bien, un coso para que loguee
-      }
+      //}
     }
 
     //En la pantalla principal del proyecto
